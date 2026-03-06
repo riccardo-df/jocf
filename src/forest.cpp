@@ -10,6 +10,14 @@
 //
 // OpenMP is used when available (_OPENMP defined).  #ifdef guards ensure
 // graceful fallback to single-threaded execution otherwise.
+//
+// Tier 1 optimisation:
+//   - X transposed to row-major layout once per function call; prediction
+//     loops use const double* xi = x_rowmaj + i*k instead of arma::rowvec.
+//   - Per-thread prediction accumulators are flat std::vector<double> (no
+//     Armadillo in the inner loop).
+//   - marginal_effects_cpp copies rows from row-major layout instead of
+//     Armadillo element access.
 
 #include "jocf_internal.h"
 #include <cmath>
@@ -81,8 +89,8 @@ static Rcpp::List tree_to_list(const TreeData& td, int M) {
 
 // ---------------------------------------------------------------------------
 // traverse_native: walk a native tree to a leaf for observation xi.
-// Template accepts arma::rowvec, std::vector<double>, or anything
-// supporting operator[].  Read-only; thread-safe.
+// xi must support operator[](int) returning a double.
+// Read-only; thread-safe.
 // ---------------------------------------------------------------------------
 template <typename T>
 static int traverse_native(const TreeData& td, const T& xi) {
@@ -94,6 +102,25 @@ static int traverse_native(const TreeData& td, const T& xi) {
                : td.right_child[node];
   }
   return node;
+}
+
+// ---------------------------------------------------------------------------
+// to_rowmaj: transpose a column-major arma matrix to a flat row-major buffer.
+// Returns a std::vector<double> of length n_rows * n_cols where
+//   result[i * n_cols + j] = x(i, j).
+// Done once per function call; eliminates per-observation arma::rowvec allocation.
+// ---------------------------------------------------------------------------
+static std::vector<double> to_rowmaj(const arma::mat& x) {
+  const int n    = static_cast<int>(x.n_rows);
+  const int k    = static_cast<int>(x.n_cols);
+  const double* xp = x.memptr();   // column-major: xp[j * n + i] = x(i, j)
+  std::vector<double> rm(static_cast<std::size_t>(n) * k);
+  for (int j = 0; j < k; ++j) {
+    const double* col = xp + static_cast<std::ptrdiff_t>(j) * n;
+    for (int i = 0; i < n; ++i)
+      rm[static_cast<std::size_t>(i) * k + j] = col[i];
+  }
+  return rm;
 }
 
 // ===========================================================================
@@ -128,12 +155,56 @@ Rcpp::List grow_forest_cpp(
 ) {
   const int n = Y.size();
 
-  // Convert Y to 0-indexed arma::ivec
-  arma::ivec y(n);
-  for (int i = 0; i < n; ++i) y[i] = Y[i] - 1;
+  // Convert Y to 0-indexed plain int vector
+  std::vector<int> y_vec(n);
+  for (int i = 0; i < n; ++i) y_vec[i] = Y[i] - 1;
 
-  const arma::mat x   = Rcpp::as<arma::mat>(X);
-  const arma::vec lam = Rcpp::as<arma::vec>(lambda);
+  const arma::mat x = Rcpp::as<arma::mat>(X);
+  const int k       = static_cast<int>(x.n_cols);
+
+  // Raw pointer to lambda weights
+  const double* lam_raw = lambda.begin();
+
+  // Pre-transpose X to row-major once for in-sample prediction loop.
+  // x_rowmaj[i * k + j] = x(i, j).
+  const std::vector<double> x_rowmaj = to_rowmaj(x);
+
+  // -------------------------------------------------------------------------
+  // Phase 0 — Global pre-sort (sequential, done once for entire forest)
+  // Compute rank array index_data[j * n + i] and unique_values[j].
+  // Cost: O(k * n * log n), amortized over all B trees.
+  // -------------------------------------------------------------------------
+  SortData sort_data;
+  sort_data.n    = n;
+  sort_data.k    = k;
+  sort_data.x_cm = x.memptr();
+  sort_data.index_data.resize(static_cast<std::size_t>(k) * n);
+  sort_data.unique_values.resize(k);
+  sort_data.n_unique.resize(k);
+
+  {
+    std::vector<std::pair<double, int>> val_idx(n);
+    for (int j = 0; j < k; ++j) {
+      const double* col = sort_data.x_cm + static_cast<std::ptrdiff_t>(j) * n;
+      for (int i = 0; i < n; ++i) val_idx[i] = {col[i], i};
+      std::sort(val_idx.begin(), val_idx.end());
+
+      sort_data.unique_values[j].clear();
+      sort_data.unique_values[j].push_back(val_idx[0].first);
+      int rank = 0;
+      sort_data.index_data[static_cast<std::ptrdiff_t>(j) * n
+                           + val_idx[0].second] = 0;
+      for (int i = 1; i < n; ++i) {
+        if (val_idx[i].first > val_idx[i - 1].first) {
+          sort_data.unique_values[j].push_back(val_idx[i].first);
+          ++rank;
+        }
+        sort_data.index_data[static_cast<std::ptrdiff_t>(j) * n
+                             + val_idx[i].second] = rank;
+      }
+      sort_data.n_unique[j] = rank + 1;
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Phase 1 — sequential, R's RNG
@@ -145,52 +216,69 @@ Rcpp::List grow_forest_cpp(
   for (int b = 0; b < num_trees; ++b)
     tree_seeds[b] = static_cast<uint32_t>(seed_doubles[b]);
 
-  std::vector<arma::uvec> boot_indices(num_trees);
+  std::vector<std::vector<int>> boot_indices(num_trees);
   for (int b = 0; b < num_trees; ++b) {
     Rcpp::IntegerVector boot_r = Rcpp::sample(n, n, /*replace=*/true) - 1;
-    boot_indices[b] = Rcpp::as<arma::uvec>(boot_r);
+    boot_indices[b].assign(boot_r.begin(), boot_r.end());
   }
 
   // -------------------------------------------------------------------------
   // Phase 2 — parallel over trees
   // -------------------------------------------------------------------------
   std::vector<TreeData> native_forest(num_trees);
-  arma::mat pred_acc(n, M, arma::fill::zeros);
+  // Flat row-major prediction accumulator: pred_flat[i * M + m]
+  std::vector<double> pred_flat(static_cast<std::size_t>(n) * M, 0.0);
 
 #ifdef _OPENMP
   const int nt_grow = (num_threads > 0) ? num_threads : omp_get_max_threads();
 #pragma omp parallel num_threads(nt_grow)
   {
-    arma::mat local_pred(n, M, arma::fill::zeros);
+    // Per-thread accumulator
+    std::vector<double> local_pred(static_cast<std::size_t>(n) * M, 0.0);
 
-#pragma omp for schedule(dynamic)
+#pragma omp for schedule(dynamic, 4)
     for (int b = 0; b < num_trees; ++b) {
       std::mt19937 rng(tree_seeds[b]);
-      native_forest[b] = grow_single_tree(y, x, boot_indices[b], M, lam,
-                                           min_node_size, mtry, rng);
-      const TreeData& td = native_forest[b];
+      native_forest[b] = grow_single_tree(
+        y_vec.data(), sort_data,
+        boot_indices[b].data(), n,
+        M, lam_raw, min_node_size, mtry, rng
+      );
+      const TreeData& td   = native_forest[b];
+      const double*   xr   = x_rowmaj.data();
+
       for (int i = 0; i < n; ++i) {
-        const arma::rowvec xi = x.row(i);
-        const int leaf = traverse_native(td, xi);
-        for (int m = 0; m < M; ++m)
-          local_pred(i, m) += td.leaf_probs[leaf * M + m];
+        const double* xi   = xr + static_cast<std::ptrdiff_t>(i) * k;
+        const int     leaf = traverse_native(td, xi);
+        const double* lp   = td.leaf_probs.data() + leaf * M;
+        double*       acc  = local_pred.data() + static_cast<std::ptrdiff_t>(i) * M;
+        for (int m = 0; m < M; ++m) acc[m] += lp[m];
       }
     }
 
 #pragma omp critical
-    pred_acc += local_pred;
+    {
+      for (std::size_t idx = 0; idx < local_pred.size(); ++idx)
+        pred_flat[idx] += local_pred[idx];
+    }
   }
 #else
   for (int b = 0; b < num_trees; ++b) {
     std::mt19937 rng(tree_seeds[b]);
-    native_forest[b] = grow_single_tree(y, x, boot_indices[b], M, lam,
-                                         min_node_size, mtry, rng);
-    const TreeData& td = native_forest[b];
+    native_forest[b] = grow_single_tree(
+      y_vec.data(), sort_data,
+      boot_indices[b].data(), n,
+      M, lam_raw, min_node_size, mtry, rng
+    );
+    const TreeData& td   = native_forest[b];
+    const double*   xr   = x_rowmaj.data();
+
     for (int i = 0; i < n; ++i) {
-      const arma::rowvec xi = x.row(i);
-      const int leaf = traverse_native(td, xi);
-      for (int m = 0; m < M; ++m)
-        pred_acc(i, m) += td.leaf_probs[leaf * M + m];
+      const double* xi   = xr + static_cast<std::ptrdiff_t>(i) * k;
+      const int     leaf = traverse_native(td, xi);
+      const double* lp   = td.leaf_probs.data() + leaf * M;
+      double*       acc  = pred_flat.data() + static_cast<std::ptrdiff_t>(i) * M;
+      for (int m = 0; m < M; ++m) acc[m] += lp[m];
     }
   }
 #endif
@@ -202,9 +290,15 @@ Rcpp::List grow_forest_cpp(
   for (int b = 0; b < num_trees; ++b)
     forest_r[b] = tree_to_list(native_forest[b], M);
 
-  const arma::mat predictions = pred_acc / static_cast<double>(num_trees);
+  // Convert flat accumulator to (n x M) Rcpp matrix (row-major -> col-major)
+  const double inv_B = 1.0 / static_cast<double>(num_trees);
+  Rcpp::NumericMatrix predictions_r(n, M);
+  for (int i = 0; i < n; ++i)
+    for (int m = 0; m < M; ++m)
+      predictions_r(i, m) = pred_flat[static_cast<std::size_t>(i) * M + m] * inv_B;
+
   return Rcpp::List::create(
-    Rcpp::Named("predictions") = Rcpp::wrap(predictions),
+    Rcpp::Named("predictions") = predictions_r,
     Rcpp::Named("forest")      = forest_r
   );
 }
@@ -235,48 +329,66 @@ Rcpp::NumericMatrix predict_forest_cpp(
   const int num_trees = static_cast<int>(forest.size());
 
   const arma::mat x_new = Rcpp::as<arma::mat>(X_new);
+  const int k           = static_cast<int>(x_new.n_cols);
+
+  // Pre-transpose X_new to row-major
+  const std::vector<double> x_rowmaj = to_rowmaj(x_new);
 
   // Deserialise all trees before entering the parallel region
   std::vector<TreeData> native_forest(num_trees);
   for (int b = 0; b < num_trees; ++b)
     native_forest[b] = list_to_tree(Rcpp::as<Rcpp::List>(forest[b]), M);
 
-  arma::mat pred_acc(n_test, M, arma::fill::zeros);
+  std::vector<double> pred_flat(static_cast<std::size_t>(n_test) * M, 0.0);
 
 #ifdef _OPENMP
   const int nt_pred = (num_threads > 0) ? num_threads : omp_get_max_threads();
 #pragma omp parallel num_threads(nt_pred)
   {
-    arma::mat local_pred(n_test, M, arma::fill::zeros);
+    std::vector<double> local_pred(static_cast<std::size_t>(n_test) * M, 0.0);
 
 #pragma omp for schedule(dynamic)
     for (int b = 0; b < num_trees; ++b) {
-      const TreeData& td = native_forest[b];
+      const TreeData& td  = native_forest[b];
+      const double*   xr  = x_rowmaj.data();
+
       for (int i = 0; i < n_test; ++i) {
-        const arma::rowvec xi = x_new.row(i);
-        const int leaf = traverse_native(td, xi);
-        for (int m = 0; m < M; ++m)
-          local_pred(i, m) += td.leaf_probs[leaf * M + m];
+        const double* xi   = xr + static_cast<std::ptrdiff_t>(i) * k;
+        const int     leaf = traverse_native(td, xi);
+        const double* lp   = td.leaf_probs.data() + leaf * M;
+        double*       acc  = local_pred.data() + static_cast<std::ptrdiff_t>(i) * M;
+        for (int m = 0; m < M; ++m) acc[m] += lp[m];
       }
     }
 
 #pragma omp critical
-    pred_acc += local_pred;
+    {
+      for (std::size_t idx = 0; idx < local_pred.size(); ++idx)
+        pred_flat[idx] += local_pred[idx];
+    }
   }
 #else
   for (int b = 0; b < num_trees; ++b) {
-    const TreeData& td = native_forest[b];
+    const TreeData& td  = native_forest[b];
+    const double*   xr  = x_rowmaj.data();
+
     for (int i = 0; i < n_test; ++i) {
-      const arma::rowvec xi = x_new.row(i);
-      const int leaf = traverse_native(td, xi);
-      for (int m = 0; m < M; ++m)
-        pred_acc(i, m) += td.leaf_probs[leaf * M + m];
+      const double* xi   = xr + static_cast<std::ptrdiff_t>(i) * k;
+      const int     leaf = traverse_native(td, xi);
+      const double* lp   = td.leaf_probs.data() + leaf * M;
+      double*       acc  = pred_flat.data() + static_cast<std::ptrdiff_t>(i) * M;
+      for (int m = 0; m < M; ++m) acc[m] += lp[m];
     }
   }
 #endif
 
-  const arma::mat predictions = pred_acc / static_cast<double>(num_trees);
-  return Rcpp::wrap(predictions);
+  const double inv_B = 1.0 / static_cast<double>(num_trees);
+  Rcpp::NumericMatrix predictions_r(n_test, M);
+  for (int i = 0; i < n_test; ++i)
+    for (int m = 0; m < M; ++m)
+      predictions_r(i, m) = pred_flat[static_cast<std::size_t>(i) * M + m] * inv_B;
+
+  return predictions_r;
 }
 
 // ===========================================================================
@@ -315,6 +427,9 @@ Rcpp::NumericMatrix marginal_effects_cpp(
 
   const arma::mat x_eval_arma = Rcpp::as<arma::mat>(X_eval);
 
+  // Pre-transpose X_eval to row-major; eliminates arma element access in loop
+  const std::vector<double> x_rowmaj = to_rowmaj(x_eval_arma);
+
   // Deserialise all trees before the parallel region
   std::vector<TreeData> native_forest(num_trees);
   for (int b = 0; b < num_trees; ++b)
@@ -342,11 +457,13 @@ Rcpp::NumericMatrix marginal_effects_cpp(
 
 #pragma omp for schedule(static)
     for (int b = 0; b < num_trees; ++b) {
-      const TreeData& td = native_forest[b];
+      const TreeData& td  = native_forest[b];
+      const double*   xr  = x_rowmaj.data();
 
       for (int i = 0; i < n_eval; ++i) {
-        // Copy row i of X_eval into xi (modifiable scratch vector)
-        for (int j = 0; j < k; ++j) xi[j] = x_eval_arma(i, j);
+        // Copy row i from row-major layout (contiguous read)
+        const double* xi_src = xr + static_cast<std::ptrdiff_t>(i) * k;
+        std::copy(xi_src, xi_src + k, xi.begin());
 
         for (int jt = 0; jt < k_target; ++jt) {
           const int    col    = t_col[jt];
@@ -371,24 +488,32 @@ Rcpp::NumericMatrix marginal_effects_cpp(
 
           const int base_hi = leaf_hi * M;
           const int base_lo = leaf_lo * M;
+          double* out = local_eff.data() + static_cast<std::ptrdiff_t>(jt) * M;
+          const double* lp_hi = td.leaf_probs.data() + base_hi;
+          const double* lp_lo = td.leaf_probs.data() + base_lo;
           for (int m = 0; m < M; ++m)
-            local_eff[jt * M + m] +=
-              (td.leaf_probs[base_hi + m] - td.leaf_probs[base_lo + m]) * scale;
+            out[m] += (lp_hi[m] - lp_lo[m]) * scale;
         }
       }
     }
 
 #pragma omp critical
-    for (int i = 0; i < k_target * M; ++i)
-      effects_acc[i] += local_eff[i];
+    {
+      for (std::size_t i = 0; i < local_eff.size(); ++i)
+        effects_acc[i] += local_eff[i];
+    }
   }
 #else
   {
     std::vector<double> xi(k);
+    const double* xr = x_rowmaj.data();
+
     for (int b = 0; b < num_trees; ++b) {
       const TreeData& td = native_forest[b];
+
       for (int i = 0; i < n_eval; ++i) {
-        for (int j = 0; j < k; ++j) xi[j] = x_eval_arma(i, j);
+        const double* xi_src = xr + static_cast<std::ptrdiff_t>(i) * k;
+        std::copy(xi_src, xi_src + k, xi.begin());
 
         for (int jt = 0; jt < k_target; ++jt) {
           const int    col    = t_col[jt];
@@ -413,9 +538,11 @@ Rcpp::NumericMatrix marginal_effects_cpp(
 
           const int base_hi = leaf_hi * M;
           const int base_lo = leaf_lo * M;
+          double* out = effects_acc.data() + static_cast<std::ptrdiff_t>(jt) * M;
+          const double* lp_hi = td.leaf_probs.data() + base_hi;
+          const double* lp_lo = td.leaf_probs.data() + base_lo;
           for (int m = 0; m < M; ++m)
-            effects_acc[jt * M + m] +=
-              (td.leaf_probs[base_hi + m] - td.leaf_probs[base_lo + m]) * scale;
+            out[m] += (lp_hi[m] - lp_lo[m]) * scale;
         }
       }
     }
@@ -430,7 +557,7 @@ Rcpp::NumericMatrix marginal_effects_cpp(
   Rcpp::NumericMatrix result(k_target, M);
   for (int jt = 0; jt < k_target; ++jt)
     for (int m = 0; m < M; ++m)
-      result(jt, m) = effects_acc[jt * M + m];
+      result(jt, m) = effects_acc[static_cast<std::size_t>(jt) * M + m];
 
   return result;
 }

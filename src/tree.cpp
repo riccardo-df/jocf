@@ -1,150 +1,178 @@
 // tree.cpp
-// Phase 2: grow_single_tree() — iterative binary partitioner for jocf.
+// Tier 4: grow_single_tree() — BFS tree growing with in-place partition.
 //
 // Returns a native TreeData struct (thread-safe, no R API).
 // The caller (grow_forest_cpp) supplies a seeded std::mt19937 for the
 // partial Fisher-Yates feature shuffle, allowing fully deterministic
 // parallel tree growing when seeds are pre-generated in R's RNG stream.
+//
+// Architecture:
+//   - No per-tree data copy: trees work on original X via SortData indirection.
+//   - In-place partition: each tree has a single sample_ids vector (bootstrap
+//     indices). Nodes tracked by start_pos/end_pos. Splits partition via swap.
+//   - Ranked split search: bucket observations by pre-computed rank, sweep
+//     unique values.  No per-node sorting.
+//   - BFS growing: nodes processed 0, 1, 2, ... sequentially. Children
+//     appended to end of arrays.
+//   - Zero per-node heap allocation.
 
 #include "jocf_internal.h"
 #include <vector>
-#include <stack>
-#include <numeric>
 #include <algorithm>
+#include <numeric>
 // [[Rcpp::depends(RcppArmadillo)]]
-
-// ---------------------------------------------------------------------------
-// Internal stack entry for iterative tree growing.
-// ---------------------------------------------------------------------------
-struct StackEntry {
-  int        node_id;
-  arma::uvec obs_local_idx;
-};
 
 // ---------------------------------------------------------------------------
 // grow_single_tree  (declared in jocf_internal.h)
 // ---------------------------------------------------------------------------
 TreeData grow_single_tree(
-  const arma::ivec& y,           // 0-indexed class labels, full dataset
-  const arma::mat&  x,           // full covariate matrix (n x k)
-  const arma::uvec& boot_idx,    // bootstrap sample (0-based row indices)
+  const int*        y,           // 0-indexed class labels, full dataset
+  const SortData&   sort_data,   // global pre-sort (read-only)
+  const int*        boot_idx,    // bootstrap indices (0-based, length n_boot)
+  int               n_boot,
   int               M,
-  const arma::vec&  lambda,
+  const double*     lambda,
   int               min_node_size,
   int               mtry,
   std::mt19937&     rng
 ) {
-  const int n_boot = static_cast<int>(boot_idx.n_elem);
-  const int k      = static_cast<int>(x.n_cols);
+  const int n = sort_data.n;
+  const int k = sort_data.k;
   const int mtry_k = std::min(mtry, k);
 
-  // Build the bootstrap subsample once (avoids repeated indexing later)
-  arma::ivec y_boot(n_boot);
-  arma::mat  x_boot(n_boot, k);
-  for (int i = 0; i < n_boot; ++i) {
-    y_boot[i]     = y[boot_idx[i]];
-    x_boot.row(i) = x.row(boot_idx[i]);
-  }
+  // Compute max_n_unique across all features for scratch buffer sizing
+  int max_n_unique = 0;
+  for (int j = 0; j < k; ++j)
+    if (sort_data.n_unique[j] > max_n_unique)
+      max_n_unique = sort_data.n_unique[j];
+
+  // ----- Per-tree buffers (zero per-node allocation) -----------------------
+  // sample_ids: mutable copy of bootstrap indices, partitioned in-place
+  std::vector<int> sample_ids(boot_idx, boot_idx + n_boot);
+
+  // Scratch for ranked split search (reused across all nodes)
+  std::vector<int> counter(max_n_unique);
+  std::vector<int> counter_pc(static_cast<std::size_t>(max_n_unique) * M);
+
+  // Feature permutation for Fisher-Yates mtry selection
+  std::vector<int> perm(k);
+  std::vector<int> feat_sub(mtry_k);
+
+  // Per-node class counts (reused)
+  std::vector<int> node_counts(M);
 
   // ----- Tree storage (dynamic, grown node by node) -----------------------
+  // Reserve based on expected tree size
+  const int reserve_sz = std::max(2 * n_boot / std::max(min_node_size, 1) + 1, 64);
+
   std::vector<int>    sf;   // split_feature  (1-based, 0 = leaf)
   std::vector<double> st;   // split_threshold
   std::vector<int>    lc;   // left_child  (0-based, -1 = leaf)
   std::vector<int>    rc;   // right_child (0-based, -1 = leaf)
-  // leaf_probs stored row-major: lp[node_id * M + m]
-  std::vector<double> lp;
+  std::vector<double> lp;   // leaf_probs row-major: [node_id * M + m]
+  std::vector<int>    start_pos;  // node start in sample_ids (inclusive)
+  std::vector<int>    end_pos;    // node end in sample_ids (exclusive)
+
+  sf.reserve(reserve_sz);
+  st.reserve(reserve_sz);
+  lc.reserve(reserve_sz);
+  rc.reserve(reserve_sz);
+  lp.reserve(static_cast<std::size_t>(reserve_sz) * M);
+  start_pos.reserve(reserve_sz);
+  end_pos.reserve(reserve_sz);
 
   // Allocate one new node; returns its 0-based index.
-  auto alloc_node = [&]() -> int {
+  auto alloc_node = [&](int s, int e) -> int {
     int id = static_cast<int>(sf.size());
     sf.push_back(0);
     st.push_back(0.0);
     lc.push_back(-1);
     rc.push_back(-1);
     for (int m = 0; m < M; ++m) lp.push_back(0.0);
+    start_pos.push_back(s);
+    end_pos.push_back(e);
     return id;
   };
 
-  // Write class proportions for a leaf node.
-  auto set_leaf = [&](int node_id, const arma::ivec& counts, int n_node) {
-    for (int m = 0; m < M; ++m)
-      lp[node_id * M + m] = static_cast<double>(counts[m]) / n_node;
-  };
+  // ----- BFS growing -------------------------------------------------------
+  alloc_node(0, n_boot);  // root node
+  int n_nodes = 1;
+  int cursor  = 0;
 
-  // ----- Iterative growing ------------------------------------------------
-  std::stack<StackEntry> stk;
-  int root_id = alloc_node();
-  stk.push({root_id, arma::regspace<arma::uvec>(0, n_boot - 1)});
+  while (cursor < n_nodes) {
+    const int s     = start_pos[cursor];
+    const int e     = end_pos[cursor];
+    const int n_obs = e - s;
 
-  // Permutation vector reused across nodes for partial Fisher-Yates
-  std::vector<int> perm(k);
+    // Class counts for this node
+    std::fill(node_counts.begin(), node_counts.end(), 0);
+    for (int i = s; i < e; ++i) node_counts[y[sample_ids[i]]]++;
 
-  while (!stk.empty()) {
-    StackEntry entry = std::move(stk.top());
-    stk.pop();
-
-    const int node_id = entry.node_id;
-    arma::uvec& obs   = entry.obs_local_idx;
-    const int n_node  = static_cast<int>(obs.n_elem);
-
-    // Compute class counts for this node
-    arma::ivec counts(M, arma::fill::zeros);
-    for (int i = 0; i < n_node; ++i) counts[y_boot[obs[i]]]++;
-
-    // Stopping condition: too few observations to split
-    if (n_node < 2 * min_node_size) {
-      set_leaf(node_id, counts, n_node);
+    // Check if too small to split
+    if (n_obs < 2 * min_node_size) {
+      // Set leaf probabilities
+      for (int m = 0; m < M; ++m)
+        lp[cursor * M + m] = static_cast<double>(node_counts[m]) / n_obs;
+      ++cursor;
       continue;
     }
 
-    // Partial Fisher-Yates to select mtry features without replacement.
-    // Uses the per-tree rng — no R API call, safe inside OpenMP parallel region.
+    // Partial Fisher-Yates to select mtry features without replacement
     std::iota(perm.begin(), perm.end(), 0);
     for (int i = 0; i < mtry_k; ++i) {
       std::uniform_int_distribution<int> d(i, k - 1);
       std::swap(perm[i], perm[d(rng)]);
     }
-    arma::uvec feat_sub(mtry_k);
-    for (int i = 0; i < mtry_k; ++i) feat_sub[i] = static_cast<arma::uword>(perm[i]);
+    for (int i = 0; i < mtry_k; ++i) feat_sub[i] = perm[i];
 
-    // Extract node sub-data
-    arma::mat  x_node = x_boot.rows(obs);   // (n_node x k)
-    arma::ivec y_node = y_boot.elem(obs);   // (n_node)
-
-    SplitResult sr = find_best_split_internal(y_node, x_node, M, lambda,
-                                               min_node_size, feat_sub);
+    // Ranked split search
+    SplitResult sr = find_best_split_ranked(
+      y, sort_data,
+      sample_ids.data(), s, e,
+      M, lambda, min_node_size,
+      feat_sub.data(), mtry_k,
+      counter, counter_pc
+    );
 
     if (!sr.found) {
-      set_leaf(node_id, counts, n_node);
+      // Set leaf probabilities
+      for (int m = 0; m < M; ++m)
+        lp[cursor * M + m] = static_cast<double>(node_counts[m]) / n_obs;
+      ++cursor;
       continue;
     }
 
-    // Record split in current node
-    sf[node_id] = sr.feature;
-    st[node_id] = sr.threshold;
+    // Record split
+    sf[cursor] = sr.feature;
+    st[cursor] = sr.threshold;
 
-    // Partition local observations into left and right children
-    const int    feat_0  = sr.feature - 1;    // 0-based column
-    arma::vec    xj_node = x_node.col(feat_0);
-    arma::uvec   left_mask  = arma::find(xj_node <= sr.threshold);
-    arma::uvec   right_mask = arma::find(xj_node >  sr.threshold);
+    // In-place partition of sample_ids[s..e-1] by RANK
+    // Observations with rank <= sr.rank go left.
+    const int split_col = sr.feature - 1;  // 0-based
+    const int* rank_col = sort_data.index_data.data()
+                          + static_cast<std::ptrdiff_t>(split_col) * n;
 
-    arma::uvec left_obs  = obs.elem(left_mask);
-    arma::uvec right_obs = obs.elem(right_mask);
+    int mid = s;
+    for (int i = s; i < e; ++i) {
+      if (rank_col[sample_ids[i]] <= sr.rank) {
+        std::swap(sample_ids[i], sample_ids[mid]);
+        ++mid;
+      }
+    }
 
-    // Allocate child nodes and wire parent -> children
-    int left_id  = alloc_node();
-    int right_id = alloc_node();
-    lc[node_id] = left_id;
-    rc[node_id] = right_id;
+    // Allocate children
+    int left_id  = alloc_node(s, mid);
+    int right_id = alloc_node(mid, e);
+    lc[cursor] = left_id;
+    rc[cursor] = right_id;
+    n_nodes += 2;
 
-    stk.push({left_id,  std::move(left_obs)});
-    stk.push({right_id, std::move(right_obs)});
+    ++cursor;
   }
 
   // ----- Fill and return TreeData -----------------------------------------
   TreeData td;
-  td.n_nodes         = static_cast<int>(sf.size());
+  td.n_nodes         = n_nodes;
   td.split_feature   = std::move(sf);
   td.split_threshold = std::move(st);
   td.left_child      = std::move(lc);
