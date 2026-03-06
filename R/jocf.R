@@ -27,6 +27,15 @@
 #' \describe{
 #'   \item{`predictions`}{(n x M) matrix of in-sample predicted class
 #'     probabilities. Rows sum to 1 and are non-negative.}
+#'   \item{`classification`}{Named list with two integer vectors (values in
+#'     `1, ..., M`):
+#'     \describe{
+#'       \item{`prob`}{Probability-based classification: argmax of forest-
+#'         averaged probabilities (eq. 5 in the spec).}
+#'       \item{`vote`}{Majority-vote classification: each tree votes for its
+#'         leaf argmax, then the class with the most votes wins (eq. 7 in
+#'         the spec). Unique to the unified OCF.}
+#'     }}
 #'   \item{`forest`}{List of B tree structures; used by [predict.jocf()].}
 #'   \item{`splitting.rule`}{Character; the splitting rule used.}
 #'   \item{`M`}{Integer; number of outcome classes.}
@@ -47,6 +56,10 @@
 #'
 #' ## In-sample predicted probabilities (n x M matrix)
 #' head(fit$predictions)
+#'
+#' ## Classifications
+#' table(fit$classification$prob)   # probability-based
+#' table(fit$classification$vote)   # majority-vote
 #'
 #' @export
 jocf <- function(Y,
@@ -87,9 +100,18 @@ jocf <- function(Y,
     num_threads   = resolve_num_threads(num.threads)
   )
 
+  predictions <- forest_result$predictions
+  votes       <- forest_result$votes
+
+  # Probability-based classification: argmax of forest-averaged probabilities
+  class_prob <- apply(predictions, 1L, which.max)
+  # Majority-vote classification: argmax of per-tree vote counts
+  class_vote <- apply(votes, 1L, which.max)
+
   structure(
     list(
-      predictions    = forest_result$predictions,
+      predictions    = predictions,
+      classification = list(prob = class_prob, vote = class_vote),
       forest         = forest_result$forest,
       splitting.rule = splitting.rule,
       M              = M,

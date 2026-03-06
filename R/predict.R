@@ -1,4 +1,4 @@
-#' Predict class probabilities from a fitted jocf object
+#' Predict class probabilities and classifications from a fitted jocf object
 #'
 #' @param object A fitted object of class `"jocf"`.
 #' @param newdata Numeric matrix or data.frame with the same number of
@@ -7,8 +7,19 @@
 #'   `NULL` (default) uses all available cores.
 #' @param ... Currently unused.
 #'
-#' @return An (nrow(newdata) x M) numeric matrix of predicted class
-#'   probabilities. Rows sum to 1 and are non-negative.
+#' @return A named list with components:
+#' \describe{
+#'   \item{`probabilities`}{(nrow(newdata) x M) numeric matrix of predicted
+#'     class probabilities. Rows sum to 1 and are non-negative.}
+#'   \item{`classification`}{Named list with two integer vectors (values in
+#'     `1, ..., M`):
+#'     \describe{
+#'       \item{`prob`}{Probability-based classification: argmax of forest-
+#'         averaged probabilities.}
+#'       \item{`vote`}{Majority-vote classification: each tree votes for its
+#'         leaf argmax, then the class with the most votes wins.}
+#'     }}
+#' }
 #'
 #' @examples
 #' ## Simulate data and fit a forest
@@ -21,7 +32,9 @@
 #' ## Predict on new observations
 #' X_new <- matrix(rnorm(10 * 3), ncol = 3)
 #' preds <- predict(fit, X_new)
-#' head(preds)
+#' head(preds$probabilities)
+#' preds$classification$prob
+#' preds$classification$vote
 #'
 #' @export
 predict.jocf <- function(object, newdata, num.threads = NULL, ...) {
@@ -37,6 +50,17 @@ predict.jocf <- function(object, newdata, num.threads = NULL, ...) {
   if (anyNA(newdata))
     stop("Missing values are not allowed in `newdata`.", call. = FALSE)
 
-  predict_forest_cpp(object$forest, newdata, as.integer(object$M),
-                     resolve_num_threads(num.threads))
+  result <- predict_forest_cpp(object$forest, newdata, as.integer(object$M),
+                               resolve_num_threads(num.threads))
+
+  predictions <- result$predictions
+  votes       <- result$votes
+
+  class_prob <- apply(predictions, 1L, which.max)
+  class_vote <- apply(votes, 1L, which.max)
+
+  list(
+    probabilities  = predictions,
+    classification = list(prob = class_prob, vote = class_vote)
+  )
 }

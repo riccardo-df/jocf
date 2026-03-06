@@ -54,12 +54,21 @@ summary(rowSums(fit$predictions))
 
 ## Prediction
 
-Use `predict()` to obtain class probabilities for new observations:
+Use `predict()` to obtain class probabilities and classifications for new
+observations:
 
 ```{r predict}
 X_new <- matrix(rnorm(10 * 4), ncol = 4)
 preds <- predict(fit, X_new)
-preds
+
+## Predicted probabilities (n_new x M matrix)
+preds$probabilities
+
+## Probability-based classification (argmax of averaged probs)
+preds$classification$prob
+
+## Majority-vote classification (unique to unified OCF)
+preds$classification$vote
 ```
 
 ## Marginal effects

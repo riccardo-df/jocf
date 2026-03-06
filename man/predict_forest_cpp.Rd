@@ -16,7 +16,7 @@ predict_forest_cpp(forest, X_new, M, num_threads = 0L)
 \item{num_threads}{Number of OpenMP threads (0 = all available).}
 }
 \value{
-Numeric matrix (n_test x M) of predicted class probabilities.
+Named list: \code{predictions} (n_test x M) and \code{votes} (n_test x M integer).
 }
 \description{
 Internal C++ engine called by \code{\link[=predict.jocf]{predict.jocf()}}.

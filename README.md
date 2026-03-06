@@ -41,9 +41,16 @@ fit <- jocf(Y, X, num.trees = 500)
 ## In-sample predicted probabilities (n x M matrix)
 head(fit$predictions)
 
+## In-sample classifications
+table(fit$classification$prob)   # probability-based
+table(fit$classification$vote)   # majority-vote (unique to unified OCF)
+
 ## Out-of-sample predictions
 X_new <- matrix(rnorm(10 * 5), ncol = 5)
-predict(fit, X_new)
+preds <- predict(fit, X_new)
+preds$probabilities            # (n_new x M) probability matrix
+preds$classification$prob      # probability-based classification
+preds$classification$vote      # majority-vote classification
 
 ## Average marginal effects
 me <- marginal_effects(fit, X)

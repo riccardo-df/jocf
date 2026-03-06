@@ -2,7 +2,7 @@
 % Please edit documentation in R/predict.R
 \name{predict.jocf}
 \alias{predict.jocf}
-\title{Predict class probabilities from a fitted jocf object}
+\title{Predict class probabilities and classifications from a fitted jocf object}
 \usage{
 \method{predict}{jocf}(object, newdata, num.threads = NULL, ...)
 }
@@ -18,11 +18,22 @@ columns as the training \code{X}.}
 \item{...}{Currently unused.}
 }
 \value{
-An (nrow(newdata) x M) numeric matrix of predicted class
-probabilities. Rows sum to 1 and are non-negative.
+A named list with components:
+\describe{
+\item{\code{probabilities}}{(nrow(newdata) x M) numeric matrix of predicted
+class probabilities. Rows sum to 1 and are non-negative.}
+\item{\code{classification}}{Named list with two integer vectors (values in
+\verb{1, ..., M}):
+\describe{
+\item{\code{prob}}{Probability-based classification: argmax of forest-
+averaged probabilities.}
+\item{\code{vote}}{Majority-vote classification: each tree votes for its
+leaf argmax, then the class with the most votes wins.}
+}}
+}
 }
 \description{
-Predict class probabilities from a fitted jocf object
+Predict class probabilities and classifications from a fitted jocf object
 }
 \examples{
 ## Simulate data and fit a forest
@@ -35,6 +46,8 @@ fit <- jocf(Y, X, num.trees = 50)
 ## Predict on new observations
 X_new <- matrix(rnorm(10 * 3), ncol = 3)
 preds <- predict(fit, X_new)
-head(preds)
+head(preds$probabilities)
+preds$classification$prob
+preds$classification$vote
 
 }

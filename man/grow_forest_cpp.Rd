@@ -33,7 +33,8 @@ grow_forest_cpp(
 \item{num_threads}{Number of OpenMP threads (0 = all available).}
 }
 \value{
-Named list: \code{predictions} (n x M) and \code{forest} (list of B trees).
+Named list: \code{predictions} (n x M), \code{forest} (list of B trees),
+\code{votes} (n x M integer matrix of per-tree majority votes).
 }
 \description{
 Internal C++ engine called by \code{\link[=jocf]{jocf()}}.

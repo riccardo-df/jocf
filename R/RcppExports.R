@@ -14,7 +14,8 @@
 #' @param lambda Numeric weight vector of length M.
 #' @param num_threads Number of OpenMP threads (0 = all available).
 #'
-#' @return Named list: `predictions` (n x M) and `forest` (list of B trees).
+#' @return Named list: `predictions` (n x M), `forest` (list of B trees),
+#'   `votes` (n x M integer matrix of per-tree majority votes).
 #' @keywords internal
 #' @export
 grow_forest_cpp <- function(Y, X, num_trees, min_node_size, mtry, M, lambda, num_threads = 0L) {
@@ -30,7 +31,7 @@ grow_forest_cpp <- function(Y, X, num_trees, min_node_size, mtry, M, lambda, num
 #' @param M Number of outcome classes.
 #' @param num_threads Number of OpenMP threads (0 = all available).
 #'
-#' @return Numeric matrix (n_test x M) of predicted class probabilities.
+#' @return Named list: `predictions` (n_test x M) and `votes` (n_test x M integer).
 #' @keywords internal
 #' @export
 predict_forest_cpp <- function(forest, X_new, M, num_threads = 0L) {

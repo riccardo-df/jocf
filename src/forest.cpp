@@ -140,7 +140,8 @@ static std::vector<double> to_rowmaj(const arma::mat& x) {
 //' @param lambda Numeric weight vector of length M.
 //' @param num_threads Number of OpenMP threads (0 = all available).
 //'
-//' @return Named list: `predictions` (n x M) and `forest` (list of B trees).
+//' @return Named list: `predictions` (n x M), `forest` (list of B trees),
+//'   `votes` (n x M integer matrix of per-tree majority votes).
 //' @keywords internal
 //' @export
 // [[Rcpp::export]]
@@ -229,13 +230,16 @@ Rcpp::List grow_forest_cpp(
   std::vector<TreeData> native_forest(num_trees);
   // Flat row-major prediction accumulator: pred_flat[i * M + m]
   std::vector<double> pred_flat(static_cast<std::size_t>(n) * M, 0.0);
+  // Flat row-major vote accumulator: vote_flat[i * M + m] = # trees voting class m for obs i
+  std::vector<int> vote_flat(static_cast<std::size_t>(n) * M, 0);
 
 #ifdef _OPENMP
   const int nt_grow = (num_threads > 0) ? num_threads : omp_get_max_threads();
 #pragma omp parallel num_threads(nt_grow)
   {
-    // Per-thread accumulator
+    // Per-thread accumulators
     std::vector<double> local_pred(static_cast<std::size_t>(n) * M, 0.0);
+    std::vector<int>    local_vote(static_cast<std::size_t>(n) * M, 0);
 
 #pragma omp for schedule(dynamic, 4)
     for (int b = 0; b < num_trees; ++b) {
@@ -254,6 +258,13 @@ Rcpp::List grow_forest_cpp(
         const double* lp   = td.leaf_probs.data() + leaf * M;
         double*       acc  = local_pred.data() + static_cast<std::ptrdiff_t>(i) * M;
         for (int m = 0; m < M; ++m) acc[m] += lp[m];
+        // Majority vote: find argmax of leaf probs for this tree
+        int best_m = 0;
+        double best_p = lp[0];
+        for (int m = 1; m < M; ++m) {
+          if (lp[m] > best_p) { best_p = lp[m]; best_m = m; }
+        }
+        local_vote[static_cast<std::size_t>(i) * M + best_m] += 1;
       }
     }
 
@@ -261,6 +272,8 @@ Rcpp::List grow_forest_cpp(
     {
       for (std::size_t idx = 0; idx < local_pred.size(); ++idx)
         pred_flat[idx] += local_pred[idx];
+      for (std::size_t idx = 0; idx < local_vote.size(); ++idx)
+        vote_flat[idx] += local_vote[idx];
     }
   }
 #else
@@ -280,6 +293,13 @@ Rcpp::List grow_forest_cpp(
       const double* lp   = td.leaf_probs.data() + leaf * M;
       double*       acc  = pred_flat.data() + static_cast<std::ptrdiff_t>(i) * M;
       for (int m = 0; m < M; ++m) acc[m] += lp[m];
+      // Majority vote: find argmax of leaf probs for this tree
+      int best_m = 0;
+      double best_p = lp[0];
+      for (int m = 1; m < M; ++m) {
+        if (lp[m] > best_p) { best_p = lp[m]; best_m = m; }
+      }
+      vote_flat[static_cast<std::size_t>(i) * M + best_m] += 1;
     }
   }
 #endif
@@ -298,9 +318,16 @@ Rcpp::List grow_forest_cpp(
     for (int m = 0; m < M; ++m)
       predictions_r(i, m) = pred_flat[static_cast<std::size_t>(i) * M + m] * inv_B;
 
+  // Convert vote accumulator to (n x M) Rcpp integer matrix
+  Rcpp::IntegerMatrix votes_r(n, M);
+  for (int i = 0; i < n; ++i)
+    for (int m = 0; m < M; ++m)
+      votes_r(i, m) = vote_flat[static_cast<std::size_t>(i) * M + m];
+
   return Rcpp::List::create(
     Rcpp::Named("predictions") = predictions_r,
-    Rcpp::Named("forest")      = forest_r
+    Rcpp::Named("forest")      = forest_r,
+    Rcpp::Named("votes")       = votes_r
   );
 }
 
@@ -317,11 +344,11 @@ Rcpp::List grow_forest_cpp(
 //' @param M Number of outcome classes.
 //' @param num_threads Number of OpenMP threads (0 = all available).
 //'
-//' @return Numeric matrix (n_test x M) of predicted class probabilities.
+//' @return Named list: `predictions` (n_test x M) and `votes` (n_test x M integer).
 //' @keywords internal
 //' @export
 // [[Rcpp::export]]
-Rcpp::NumericMatrix predict_forest_cpp(
+Rcpp::List predict_forest_cpp(
   Rcpp::List          forest,
   Rcpp::NumericMatrix X_new,
   int                 M,
@@ -342,12 +369,14 @@ Rcpp::NumericMatrix predict_forest_cpp(
     native_forest[b] = list_to_tree(Rcpp::as<Rcpp::List>(forest[b]), M);
 
   std::vector<double> pred_flat(static_cast<std::size_t>(n_test) * M, 0.0);
+  std::vector<int>    vote_flat(static_cast<std::size_t>(n_test) * M, 0);
 
 #ifdef _OPENMP
   const int nt_pred = (num_threads > 0) ? num_threads : omp_get_max_threads();
 #pragma omp parallel num_threads(nt_pred)
   {
     std::vector<double> local_pred(static_cast<std::size_t>(n_test) * M, 0.0);
+    std::vector<int>    local_vote(static_cast<std::size_t>(n_test) * M, 0);
 
 #pragma omp for schedule(dynamic)
     for (int b = 0; b < num_trees; ++b) {
@@ -360,6 +389,13 @@ Rcpp::NumericMatrix predict_forest_cpp(
         const double* lp   = td.leaf_probs.data() + leaf * M;
         double*       acc  = local_pred.data() + static_cast<std::ptrdiff_t>(i) * M;
         for (int m = 0; m < M; ++m) acc[m] += lp[m];
+        // Majority vote: find argmax of leaf probs for this tree
+        int best_m = 0;
+        double best_p = lp[0];
+        for (int m = 1; m < M; ++m) {
+          if (lp[m] > best_p) { best_p = lp[m]; best_m = m; }
+        }
+        local_vote[static_cast<std::size_t>(i) * M + best_m] += 1;
       }
     }
 
@@ -367,6 +403,8 @@ Rcpp::NumericMatrix predict_forest_cpp(
     {
       for (std::size_t idx = 0; idx < local_pred.size(); ++idx)
         pred_flat[idx] += local_pred[idx];
+      for (std::size_t idx = 0; idx < local_vote.size(); ++idx)
+        vote_flat[idx] += local_vote[idx];
     }
   }
 #else
@@ -380,6 +418,13 @@ Rcpp::NumericMatrix predict_forest_cpp(
       const double* lp   = td.leaf_probs.data() + leaf * M;
       double*       acc  = pred_flat.data() + static_cast<std::ptrdiff_t>(i) * M;
       for (int m = 0; m < M; ++m) acc[m] += lp[m];
+      // Majority vote: find argmax of leaf probs for this tree
+      int best_m = 0;
+      double best_p = lp[0];
+      for (int m = 1; m < M; ++m) {
+        if (lp[m] > best_p) { best_p = lp[m]; best_m = m; }
+      }
+      vote_flat[static_cast<std::size_t>(i) * M + best_m] += 1;
     }
   }
 #endif
@@ -390,7 +435,15 @@ Rcpp::NumericMatrix predict_forest_cpp(
     for (int m = 0; m < M; ++m)
       predictions_r(i, m) = pred_flat[static_cast<std::size_t>(i) * M + m] * inv_B;
 
-  return predictions_r;
+  Rcpp::IntegerMatrix votes_r(n_test, M);
+  for (int i = 0; i < n_test; ++i)
+    for (int m = 0; m < M; ++m)
+      votes_r(i, m) = vote_flat[static_cast<std::size_t>(i) * M + m];
+
+  return Rcpp::List::create(
+    Rcpp::Named("predictions") = predictions_r,
+    Rcpp::Named("votes")       = votes_r
+  );
 }
 
 // ===========================================================================

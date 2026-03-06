@@ -48,6 +48,15 @@ An object of class \code{"jocf"} — a list with components:
 \describe{
 \item{\code{predictions}}{(n x M) matrix of in-sample predicted class
 probabilities. Rows sum to 1 and are non-negative.}
+\item{\code{classification}}{Named list with two integer vectors (values in
+\verb{1, ..., M}):
+\describe{
+\item{\code{prob}}{Probability-based classification: argmax of forest-
+averaged probabilities (eq. 5 in the spec).}
+\item{\code{vote}}{Majority-vote classification: each tree votes for its
+leaf argmax, then the class with the most votes wins (eq. 7 in
+the spec). Unique to the unified OCF.}
+}}
 \item{\code{forest}}{List of B tree structures; used by \code{\link[=predict.jocf]{predict.jocf()}}.}
 \item{\code{splitting.rule}}{Character; the splitting rule used.}
 \item{\code{M}}{Integer; number of outcome classes.}
@@ -74,5 +83,9 @@ fit <- jocf(Y, X, num.trees = 50)
 
 ## In-sample predicted probabilities (n x M matrix)
 head(fit$predictions)
+
+## Classifications
+table(fit$classification$prob)   # probability-based
+table(fit$classification$vote)   # majority-vote
 
 }

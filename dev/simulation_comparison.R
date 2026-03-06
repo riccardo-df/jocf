@@ -100,7 +100,7 @@ for (r in seq_len(N_REP)) {
   )["elapsed"]
 
   # --- Predict ---
-  p_j  <- predict(fit_j, X_te)
+  p_j  <- predict(fit_j, X_te)$probabilities
   p_os <- predict(fit_os, X_te)$probabilities
   p_ob <- predict(fit_ob, X_te)$probabilities
 

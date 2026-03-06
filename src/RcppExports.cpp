@@ -30,7 +30,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // predict_forest_cpp
-Rcpp::NumericMatrix predict_forest_cpp(Rcpp::List forest, Rcpp::NumericMatrix X_new, int M, int num_threads);
+Rcpp::List predict_forest_cpp(Rcpp::List forest, Rcpp::NumericMatrix X_new, int M, int num_threads);
 RcppExport SEXP _jocf_predict_forest_cpp(SEXP forestSEXP, SEXP X_newSEXP, SEXP MSEXP, SEXP num_threadsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;

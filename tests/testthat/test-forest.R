@@ -102,7 +102,7 @@ test_that("predict.jocf: out-of-sample dimensions are correct", {
   fit   <- jocf(d$Y, d$X, num.trees = 50)
   X_new <- matrix(rnorm(20 * 4), 20, 4)
   pred  <- predict(fit, newdata = X_new)
-  expect_equal(dim(pred), c(20L, d$M))
+  expect_equal(dim(pred$probabilities), c(20L, d$M))
 })
 
 test_that("predict.jocf: out-of-sample row sums equal 1", {
@@ -110,7 +110,7 @@ test_that("predict.jocf: out-of-sample row sums equal 1", {
   fit   <- jocf(d$Y, d$X, num.trees = 50)
   X_new <- matrix(rnorm(30 * 4), 30, 4)
   pred  <- predict(fit, newdata = X_new)
-  expect_equal(rowSums(pred), rep(1, 30), tolerance = 1e-10)
+  expect_equal(rowSums(pred$probabilities), rep(1, 30), tolerance = 1e-10)
 })
 
 test_that("predict.jocf: out-of-sample predictions are non-negative", {
@@ -118,7 +118,7 @@ test_that("predict.jocf: out-of-sample predictions are non-negative", {
   fit   <- jocf(d$Y, d$X, num.trees = 50)
   X_new <- matrix(rnorm(50 * 3), 50, 3)
   pred  <- predict(fit, newdata = X_new)
-  expect_true(all(pred >= 0))
+  expect_true(all(pred$probabilities >= 0))
 })
 
 test_that("predict.jocf: error on wrong number of columns", {
