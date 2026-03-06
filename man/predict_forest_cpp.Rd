@@ -21,3 +21,4 @@ Numeric matrix (n_test x M) of predicted class probabilities.
 \description{
 Internal C++ engine called by \code{\link[=predict.jocf]{predict.jocf()}}.
 }
+\keyword{internal}

@@ -26,3 +26,4 @@ Gini impurity:
 where \eqn{\check{p}_m(C) = \texttt{counts}[m] / n}.
 Pass \code{lambda = rep(1, M)} for the unweighted criterion.
 }
+\keyword{internal}

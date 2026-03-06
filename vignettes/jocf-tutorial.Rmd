@@ -1,0 +1,121 @@
+---
+title: "Getting Started with jocf"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with jocf}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+The `jocf` package estimates conditional choice probabilities for ordered
+discrete outcomes $Y \in \{1, \ldots, M\}$ given covariates $W$.  It grows a
+**single** random forest whose splitting criterion jointly minimises average
+estimation error across all $M$ classes simultaneously.  This is in contrast to
+the published `ocf` package, which grows $M$ separate forests.
+
+The output is an $(n \times M)$ matrix of predicted probabilities
+$\hat{p}_m(w) = \hat{P}(Y = m \mid W = w)$, where rows sum to 1 by
+construction.
+
+## Basic usage
+
+```{r fit}
+library(jocf)
+
+## Simulate ordered outcome data
+set.seed(123)
+n <- 200
+X <- matrix(rnorm(n * 4), ncol = 4, dimnames = list(NULL, paste0("x", 1:4)))
+latent <- X[, 1] - 0.5 * X[, 2] + rnorm(n)
+Y <- as.integer(cut(latent, breaks = c(-Inf, -0.5, 0.5, Inf)))
+
+## Fit a joint ordered correlation forest
+fit <- jocf(Y, X, num.trees = 100)
+```
+
+The returned object is of class `"jocf"`.  In-sample predictions are stored in
+`$predictions`:
+
+```{r insample}
+head(fit$predictions)
+
+## Rows sum to 1
+summary(rowSums(fit$predictions))
+```
+
+## Prediction
+
+Use `predict()` to obtain class probabilities for new observations:
+
+```{r predict}
+X_new <- matrix(rnorm(10 * 4), ncol = 4)
+preds <- predict(fit, X_new)
+preds
+```
+
+## Marginal effects
+
+`marginal_effects()` computes nonparametric average marginal effects (AME)
+following Lechner (2019).  For continuous covariates, it uses finite differences;
+for discrete covariates, unit changes.
+
+```{r me}
+## AME averaged over all training observations
+me <- marginal_effects(fit, X)
+me
+```
+
+You can evaluate at specific summary points and restrict to a subset of
+covariates:
+
+```{r me_options}
+## AME evaluated at the covariate means, for covariates 1 and 3 only
+me_atmean <- marginal_effects(fit, X, eval = "atmean",
+                              target_covariates = c(1, 3))
+me_atmean
+```
+
+If some covariates are discrete, pass their column indices via `discrete_vars`:
+
+```{r me_discrete}
+## Treat covariate 4 as discrete
+me_disc <- marginal_effects(fit, X, discrete_vars = 4)
+me_disc
+```
+
+## Splitting rules
+
+`jocf()` supports two splitting rules:
+
+- `"simple"` (default): equal weight across all $M$ classes.
+- `"weighted"`: each class is weighted by the inverse of its population-level
+  Bernoulli variance, giving rare classes more influence.
+
+```{r weighted}
+fit_w <- jocf(Y, X, num.trees = 100, splitting.rule = "weighted")
+head(fit_w$predictions)
+```
+
+See `vignette("jocf-theory")` for the mathematical derivation.
+
+## Parallelism
+
+Tree growing, prediction, and marginal effects are parallelised via OpenMP.
+By default, all available cores are used.  Control the number of threads with
+`num.threads`:
+
+```{r threads, eval = FALSE}
+## Use 2 threads
+fit2 <- jocf(Y, X, num.trees = 100, num.threads = 2)
+preds2 <- predict(fit2, X_new, num.threads = 2)
+me2 <- marginal_effects(fit2, X, num.threads = 2)
+```

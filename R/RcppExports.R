@@ -15,6 +15,7 @@
 #' @param num_threads Number of OpenMP threads (0 = all available).
 #'
 #' @return Named list: `predictions` (n x M) and `forest` (list of B trees).
+#' @keywords internal
 #' @export
 grow_forest_cpp <- function(Y, X, num_trees, min_node_size, mtry, M, lambda, num_threads = 0L) {
     .Call(`_jocf_grow_forest_cpp`, Y, X, num_trees, min_node_size, mtry, M, lambda, num_threads)
@@ -30,6 +31,7 @@ grow_forest_cpp <- function(Y, X, num_trees, min_node_size, mtry, M, lambda, num
 #' @param num_threads Number of OpenMP threads (0 = all available).
 #'
 #' @return Numeric matrix (n_test x M) of predicted class probabilities.
+#' @keywords internal
 #' @export
 predict_forest_cpp <- function(forest, X_new, M, num_threads = 0L) {
     .Call(`_jocf_predict_forest_cpp`, forest, X_new, M, num_threads)
@@ -49,6 +51,7 @@ predict_forest_cpp <- function(forest, X_new, M, num_threads = 0L) {
 #' @param num_threads Number of OpenMP threads (0 = all available).
 #'
 #' @return Numeric matrix (k_target x M) of average marginal effects.
+#' @keywords internal
 #' @export
 marginal_effects_cpp <- function(forest, X_eval, target_vars, is_discrete, h_vec, M, num_threads = 0L) {
     .Call(`_jocf_marginal_effects_cpp`, forest, X_eval, target_vars, is_discrete, h_vec, M, num_threads)
@@ -69,6 +72,7 @@ marginal_effects_cpp <- function(forest, X_eval, target_vars, is_discrete, h_vec
 #' @param lambda Numeric weight vector of length M.
 #'
 #' @return Scalar node impurity.
+#' @keywords internal
 #' @export
 node_impurity_cpp <- function(counts, n, M, lambda) {
     .Call(`_jocf_node_impurity_cpp`, counts, n, M, lambda)
@@ -88,6 +92,7 @@ node_impurity_cpp <- function(counts, n, M, lambda) {
 #'
 #' @return A named list with elements `feature` (1-based integer), `threshold`
 #'   (numeric), `impurity` (numeric), and `found` (logical).
+#' @keywords internal
 #' @export
 find_best_split_cpp <- function(y, x, M, lambda, min_node_size) {
     .Call(`_jocf_find_best_split_cpp`, y, x, M, lambda, min_node_size)

@@ -17,3 +17,14 @@ Method-specific; see the relevant method documentation.
 \description{
 Generic function; see \code{\link[=marginal_effects.jocf]{marginal_effects.jocf()}} for the jocf method.
 }
+\examples{
+## See marginal_effects.jocf() for a full example
+set.seed(42)
+n <- 150
+X <- matrix(rnorm(n * 3), ncol = 3)
+Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+fit <- jocf(Y, X, num.trees = 50)
+me <- marginal_effects(fit, X)
+me
+
+}

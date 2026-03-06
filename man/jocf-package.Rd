@@ -5,10 +5,22 @@
 \alias{jocf-package}
 \title{jocf: Joint Ordered Correlation Forest}
 \description{
-Estimates conditional choice probabilities for ordered discrete outcomes using a single random forest with a joint splitting criterion that minimises average estimation error across all classes simultaneously. In contrast to the published 'ocf' package, which grows M separate forests, 'jocf' grows one forest whose splitting rule is equivalent to minimising total CART Gini impurity (Proposition 1 in the package vignette).
+The \pkg{jocf} package estimates conditional choice probabilities for ordered
+discrete outcomes \eqn{Y \in \{1, \ldots, M\}} using a single random forest
+with a joint splitting criterion.  Unlike the published \pkg{ocf} package,
+which grows \eqn{M} separate forests, \pkg{jocf} grows one forest whose
+splitting rule is equivalent to minimising total CART Gini impurity
+(Proposition 1 in \code{vignette("jocf-theory")}).
+}
+\seealso{
+\itemize{
+\item \code{\link[=jocf]{jocf()}} to fit a forest
+\item \code{\link[=predict.jocf]{predict.jocf()}} for out-of-sample predictions
+\item \code{\link[=marginal_effects.jocf]{marginal_effects.jocf()}} for nonparametric marginal effects
+}
 }
 \author{
-\strong{Maintainer}: Author Name \email{author@example.com}
+\strong{Maintainer}: Riccardo Di Francesco \email{TODO@email.com}
 
 }
 \keyword{internal}

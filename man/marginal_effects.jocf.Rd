@@ -76,3 +76,21 @@ where \eqn{\hat{\sigma}_j} is the sample standard deviation of covariate
 The AME for covariate \eqn{j} and class \eqn{m} is the average of these
 individual effects over all evaluation points.
 }
+\examples{
+## Simulate data and fit a forest
+set.seed(42)
+n <- 150
+X <- matrix(rnorm(n * 3), ncol = 3)
+Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+fit <- jocf(Y, X, num.trees = 50)
+
+## Average marginal effects (all covariates)
+me <- marginal_effects(fit, X)
+me
+
+## Evaluate at the mean and for selected covariates only
+me_atmean <- marginal_effects(fit, X, eval = "atmean",
+                              target_covariates = c(1, 3))
+me_atmean
+
+}

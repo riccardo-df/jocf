@@ -62,3 +62,17 @@ average estimation error across all M outcome classes simultaneously.
 The criterion is equivalent to average CART Gini impurity (Proposition 1
 in the package vignette).
 }
+\examples{
+## Simulate ordered outcome data
+set.seed(42)
+n <- 150
+X <- matrix(rnorm(n * 3), ncol = 3)
+Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+
+## Fit a joint ordered correlation forest
+fit <- jocf(Y, X, num.trees = 50)
+
+## In-sample predicted probabilities (n x M matrix)
+head(fit$predictions)
+
+}

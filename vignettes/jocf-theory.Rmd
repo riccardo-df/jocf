@@ -1,0 +1,205 @@
+---
+title: "Mathematical Background"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Mathematical Background}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This vignette describes the mathematical foundations of the joint ordered
+correlation forest implemented in the `jocf` package.
+
+## Setup
+
+Consider an i.i.d. sample $(Y_i, W_i)$, $i = 1, \ldots, n$, where
+$Y_i \in \{1, \ldots, M\}$ is an ordered discrete outcome and
+$W_i \in \mathbb{R}^k$ is a vector of covariates.
+
+The targets of estimation are the conditional choice probabilities
+
+$$
+p_m(w) = P(Y_i = m \mid W_i = w), \quad m = 1, \ldots, M.
+$$
+
+## Cumulative decomposition
+
+Define the cumulative probabilities
+
+$$
+\mu_m(w) = P(Y_i \le m \mid W_i = w) = \sum_{j=1}^{m} p_j(w),
+$$
+
+with boundary conditions $\mu_0(w) = 0$ and $\mu_M(w) = 1$.  Then each class
+probability decomposes as
+
+$$
+p_m(w) = \mu_m(w) - \mu_{m-1}(w).
+$$
+
+This decomposition is key: estimating all $M$ class probabilities is equivalent
+to estimating $M - 1$ cumulative probabilities.
+
+## MSE criterion and error correlation
+
+A natural criterion for jointly estimating $p_1(w), \ldots, p_M(w)$ is the
+total mean squared error
+
+$$
+\text{MSE}_{\text{total}} = \frac{1}{M} \sum_{m=1}^{M}
+  E\!\left[\left(\hat{p}_m(w) - p_m(w)\right)^2\right].
+$$
+
+For a tree-based estimator where $\hat{p}_m(w)$ is the sample proportion of
+class $m$ within the leaf containing $w$, the MSE of $\hat{p}_m$ in a node $C$
+with $|C|$ observations is
+
+$$
+E\!\left[\left(\hat{p}_m - p_m\right)^2 \mid C\right]
+  = \frac{p_m(1 - p_m)}{|C|}.
+$$
+
+Since all $M$ estimators share the same leaf (same observations), the errors
+$\hat{p}_m - p_m$ are correlated.  Let $\varepsilon_m = \hat{p}_m - p_m$.
+Because $\sum_m \hat{p}_m = \sum_m p_m = 1$, the errors satisfy
+$\sum_m \varepsilon_m = 0$, which induces negative correlations.
+
+## Proposition 1: ordered containment implies average Gini
+
+The key insight is that the ordered containment structure
+$\{Y \le m-1\} \subseteq \{Y \le m\}$ causes the error correlation terms to
+collapse exactly into a form that depends only on class proportions.
+
+**Proposition 1.** *For ordered discrete $Y \in \{1, \ldots, M\}$, the total
+MSE criterion (including all pairwise error correlations) for a node $C$ is
+proportional to*
+
+$$
+Q(C) = \frac{1}{M} \sum_{m=1}^{M} \hat{p}_m(C) \left(1 - \hat{p}_m(C)\right),
+$$
+
+*where $\hat{p}_m(C) = |\{i \in C : Y_i = m\}| / |C|$ is the sample proportion
+of class $m$ in node $C$.*
+
+This is precisely the **average CART Gini impurity** across classes.  The
+ordered structure ensures that the cross-correlation terms between different
+class estimators do not contribute additional information to the splitting
+criterion — they simplify into the same Gini form.
+
+**Consequence.** Only class-frequency counts are needed per candidate node.  No
+cumulative probabilities, no covariance matrices.
+
+## Splitting criterion
+
+### Unweighted
+
+For a candidate split of parent node $P$ into children $C_1, C_2$, the
+splitting criterion minimises
+
+$$
+Q(C_1) + Q(C_2),
+$$
+
+where
+
+$$
+Q(C) = \frac{1}{M} \sum_{m=1}^{M} \hat{p}_m(C) \left(1 - \hat{p}_m(C)\right).
+$$
+
+### Variance-weighted
+
+To give equal importance to rare and common classes, we can weight each class
+by the inverse of its population-level Bernoulli variance:
+
+$$
+Q_w(C) = \frac{1}{M} \sum_{m=1}^{M} \lambda_m \, \hat{p}_m(C)
+  \left(1 - \hat{p}_m(C)\right),
+$$
+
+where
+
+$$
+\lambda_m = \frac{1}{\bar{p}_m (1 - \bar{p}_m)},
+$$
+
+and $\bar{p}_m = n^{-1} \sum_{i=1}^{n} \mathbf{1}(Y_i = m)$ is the global
+sample proportion of class $m$.
+
+The weights $\lambda_m$ are computed **once** from the full training data before
+any tree is grown.  They are fixed scalars, identical across all nodes and
+trees.
+
+## Leaf predictions and forest aggregation
+
+After tree $b$ is grown, the prediction at point $w$ is
+
+$$
+\hat{p}_{m,b}(w) = \frac{1}{|L_b(w)|} \sum_{i \in L_b(w)}
+  \mathbf{1}(Y_i = m), \quad m = 1, \ldots, M,
+$$
+
+where $L_b(w)$ denotes the leaf of tree $b$ containing $w$.  Each leaf stores
+an $M$-vector of class proportions.
+
+The forest prediction averages over all $B$ trees:
+
+$$
+\hat{p}_m(w) = \frac{1}{B} \sum_{b=1}^{B} \hat{p}_{m,b}(w).
+$$
+
+By construction, $\hat{p}_m(w) \ge 0$ for all $m$ and
+$\sum_m \hat{p}_m(w) = 1$ — no normalisation is needed.
+
+## Marginal effects
+
+Following Lechner (2019), marginal effects are computed nonparametrically via
+finite differences.
+
+### Continuous covariates
+
+For continuous covariate $j$ at evaluation point $w$:
+
+$$
+\widehat{\partial}_j p_m(w) =
+  \frac{\hat{p}_m(w + \omega \hat{\sigma}_j e_j)
+        - \hat{p}_m(w - \omega \hat{\sigma}_j e_j)}
+       {2 \omega \hat{\sigma}_j},
+$$
+
+where $\hat{\sigma}_j$ is the sample standard deviation of covariate $j$,
+$e_j$ is the $j$-th unit vector, and $\omega > 0$ is a small bandwidth
+(default 0.001).
+
+### Discrete covariates
+
+For discrete covariate $j$:
+
+$$
+\widehat{\partial}_j p_m(w) =
+  \hat{p}_m(w \text{ with } x_j = \lfloor x_{ij} \rfloor + 1)
+  - \hat{p}_m(w \text{ with } x_j = \lfloor x_{ij} \rfloor).
+$$
+
+### Average marginal effects
+
+The **average marginal effect** (AME) is obtained by averaging individual
+effects over evaluation points:
+
+$$
+\text{AME}_{j,m} = \frac{1}{n_{\text{eval}}} \sum_{i=1}^{n_{\text{eval}}}
+  \widehat{\partial}_j p_m(w_i).
+$$
+
+## References
+
+- Lechner, M. (2019). Modified Causal Forests for Estimating Heterogeneous
+  Causal Effects. *arXiv preprint arXiv:1812.09487*.
+- Lechner, M. & Okasa, G. (2019). Random Forest Estimation of the Ordered
+  Choice Model. *arXiv preprint arXiv:1907.02436*.

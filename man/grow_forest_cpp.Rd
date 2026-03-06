@@ -38,3 +38,4 @@ Named list: \code{predictions} (n x M) and \code{forest} (list of B trees).
 \description{
 Internal C++ engine called by \code{\link[=jocf]{jocf()}}.
 }
+\keyword{internal}

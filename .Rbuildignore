@@ -2,3 +2,6 @@
 ^\.Rproj\.user$
 ^.*\.Rproj$
 ^LICENSE\.md$
+^README\.Rmd$
+^\.github$
+^vignettes/.*_cache$

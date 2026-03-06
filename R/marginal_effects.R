@@ -6,6 +6,17 @@
 #' @param ... Additional arguments passed to the method.
 #'
 #' @return Method-specific; see the relevant method documentation.
+#'
+#' @examples
+#' ## See marginal_effects.jocf() for a full example
+#' set.seed(42)
+#' n <- 150
+#' X <- matrix(rnorm(n * 3), ncol = 3)
+#' Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+#' fit <- jocf(Y, X, num.trees = 50)
+#' me <- marginal_effects(fit, X)
+#' me
+#'
 #' @export
 marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 
@@ -60,6 +71,23 @@ marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 #'   \item{`omega`}{Bandwidth used for continuous variables.}
 #'   \item{`call`}{The matched call.}
 #' }
+#'
+#' @examples
+#' ## Simulate data and fit a forest
+#' set.seed(42)
+#' n <- 150
+#' X <- matrix(rnorm(n * 3), ncol = 3)
+#' Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+#' fit <- jocf(Y, X, num.trees = 50)
+#'
+#' ## Average marginal effects (all covariates)
+#' me <- marginal_effects(fit, X)
+#' me
+#'
+#' ## Evaluate at the mean and for selected covariates only
+#' me_atmean <- marginal_effects(fit, X, eval = "atmean",
+#'                               target_covariates = c(1, 3))
+#' me_atmean
 #'
 #' @export
 marginal_effects.jocf <- function(object,

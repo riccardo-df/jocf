@@ -141,6 +141,7 @@ static std::vector<double> to_rowmaj(const arma::mat& x) {
 //' @param num_threads Number of OpenMP threads (0 = all available).
 //'
 //' @return Named list: `predictions` (n x M) and `forest` (list of B trees).
+//' @keywords internal
 //' @export
 // [[Rcpp::export]]
 Rcpp::List grow_forest_cpp(
@@ -317,6 +318,7 @@ Rcpp::List grow_forest_cpp(
 //' @param num_threads Number of OpenMP threads (0 = all available).
 //'
 //' @return Numeric matrix (n_test x M) of predicted class probabilities.
+//' @keywords internal
 //' @export
 // [[Rcpp::export]]
 Rcpp::NumericMatrix predict_forest_cpp(
@@ -409,6 +411,7 @@ Rcpp::NumericMatrix predict_forest_cpp(
 //' @param num_threads Number of OpenMP threads (0 = all available).
 //'
 //' @return Numeric matrix (k_target x M) of average marginal effects.
+//' @keywords internal
 //' @export
 // [[Rcpp::export]]
 Rcpp::NumericMatrix marginal_effects_cpp(

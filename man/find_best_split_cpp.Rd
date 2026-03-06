@@ -26,3 +26,4 @@ Exhaustively searches all features and candidate thresholds for the split
 that minimises \code{Q(left) + Q(right)}.  Ties in feature values are skipped
 (no split between identical values).
 }
+\keyword{internal}

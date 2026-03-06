@@ -36,3 +36,4 @@ Numeric matrix (k_target x M) of average marginal effects.
 \description{
 Internal C++ engine called by \code{\link[=marginal_effects.jocf]{marginal_effects.jocf()}}.
 }
+\keyword{internal}

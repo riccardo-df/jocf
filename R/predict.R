@@ -10,6 +10,19 @@
 #' @return An (nrow(newdata) x M) numeric matrix of predicted class
 #'   probabilities. Rows sum to 1 and are non-negative.
 #'
+#' @examples
+#' ## Simulate data and fit a forest
+#' set.seed(42)
+#' n <- 150
+#' X <- matrix(rnorm(n * 3), ncol = 3)
+#' Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
+#' fit <- jocf(Y, X, num.trees = 50)
+#'
+#' ## Predict on new observations
+#' X_new <- matrix(rnorm(10 * 3), ncol = 3)
+#' preds <- predict(fit, X_new)
+#' head(preds)
+#'
 #' @export
 predict.jocf <- function(object, newdata, num.threads = NULL, ...) {
   if (!inherits(object, "jocf"))

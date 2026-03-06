@@ -242,6 +242,7 @@ SplitResult find_best_split_ranked(
 //' @param lambda Numeric weight vector of length M.
 //'
 //' @return Scalar node impurity.
+//' @keywords internal
 //' @export
 // [[Rcpp::export]]
 double node_impurity_cpp(Rcpp::IntegerVector counts,
@@ -284,6 +285,7 @@ double node_impurity_cpp(Rcpp::IntegerVector counts,
 //'
 //' @return A named list with elements `feature` (1-based integer), `threshold`
 //'   (numeric), `impurity` (numeric), and `found` (logical).
+//' @keywords internal
 //' @export
 // [[Rcpp::export]]
 Rcpp::List find_best_split_cpp(Rcpp::IntegerVector y,
