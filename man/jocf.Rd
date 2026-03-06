@@ -52,10 +52,10 @@ probabilities. Rows sum to 1 and are non-negative.}
 \verb{1, ..., M}):
 \describe{
 \item{\code{prob}}{Probability-based classification: argmax of forest-
-averaged probabilities (eq. 5 in the spec).}
+averaged probabilities (see \code{vignette("jocf-theory")}).}
 \item{\code{vote}}{Majority-vote classification: each tree votes for its
-leaf argmax, then the class with the most votes wins (eq. 7 in
-the spec). Unique to the unified OCF.}
+leaf argmax, then the class with the most votes wins.  Unique to
+the unified OCF (see \code{vignette("jocf-theory")}).}
 }}
 \item{\code{forest}}{List of B tree structures; used by \code{\link[=predict.jocf]{predict.jocf()}}.}
 \item{\code{splitting.rule}}{Character; the splitting rule used.}

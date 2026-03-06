@@ -26,9 +26,10 @@ class probabilities. Rows sum to 1 and are non-negative.}
 \verb{1, ..., M}):
 \describe{
 \item{\code{prob}}{Probability-based classification: argmax of forest-
-averaged probabilities.}
+averaged probabilities (see \code{vignette("jocf-theory")}).}
 \item{\code{vote}}{Majority-vote classification: each tree votes for its
-leaf argmax, then the class with the most votes wins.}
+leaf argmax, then the class with the most votes wins.  Unique to
+the unified OCF (see \code{vignette("jocf-theory")}).}
 }}
 }
 }

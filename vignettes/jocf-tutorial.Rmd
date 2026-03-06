@@ -16,15 +16,19 @@ knitr::opts_chunk$set(
 
 ## Introduction
 
-The `jocf` package estimates conditional choice probabilities for ordered
-discrete outcomes $Y \in \{1, \ldots, M\}$ given covariates $W$.  It grows a
-**single** random forest whose splitting criterion jointly minimises average
-estimation error across all $M$ classes simultaneously.  This is in contrast to
-the published `ocf` package, which grows $M$ separate forests.
+The `jocf` package estimates conditional choice probabilities and
+classifications for ordered discrete outcomes $Y \in \{1, \ldots, M\}$ given
+covariates $W$.  It grows a **single** random forest whose splitting criterion
+jointly minimises average estimation error across all $M$ classes
+simultaneously.  This is in contrast to the published `ocf` package, which
+grows $M$ separate forests.
 
-The output is an $(n \times M)$ matrix of predicted probabilities
+The output includes an $(n \times M)$ matrix of predicted probabilities
 $\hat{p}_m(w) = \hat{P}(Y = m \mid W = w)$, where rows sum to 1 by
-construction.
+construction, together with two classification rules: probability-based
+(argmax of averaged probabilities) and majority-vote (per-tree argmax
+aggregation).  The majority-vote classifier is unique to the unified OCF and
+not available to multi-forest approaches.
 
 ## Basic usage
 
@@ -52,22 +56,44 @@ head(fit$predictions)
 summary(rowSums(fit$predictions))
 ```
 
+## Classification
+
+Both `jocf()` and `predict()` return two classification rules in
+`$classification`:
+
+- **`$prob`** — probability-based: argmax of forest-averaged probabilities.
+  This targets the conditional mode and minimises 0--1 loss with respect to the
+  estimated distribution.
+- **`$vote`** — majority-vote: each tree votes for its leaf argmax, then the
+  class receiving the most votes wins.  This rule is unique to the unified OCF
+  because the original OCF has no common leaf structure across classes.
+
+```{r classification}
+## In-sample classifications
+table(fit$classification$prob)
+table(fit$classification$vote)
+```
+
+See `vignette("jocf-theory")` for the mathematical derivation.
+
 ## Prediction
 
 Use `predict()` to obtain class probabilities and classifications for new
-observations:
+observations.  The return value is a named list with `$probabilities`
+(an $(n \times M)$ matrix) and `$classification` (a list with `$prob`
+and `$vote` integer vectors).
 
 ```{r predict}
 X_new <- matrix(rnorm(10 * 4), ncol = 4)
 preds <- predict(fit, X_new)
 
 ## Predicted probabilities (n_new x M matrix)
-preds$probabilities
+head(preds$probabilities)
 
-## Probability-based classification (argmax of averaged probs)
+## Probability-based classification
 preds$classification$prob
 
-## Majority-vote classification (unique to unified OCF)
+## Majority-vote classification
 preds$classification$vote
 ```
 

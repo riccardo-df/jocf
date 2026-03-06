@@ -4,12 +4,14 @@ Version: 0.0.0.9000
 Authors@R:
     person("Riccardo", "Di Francesco", email = "TODO@email.com",
            role = c("aut", "cre"))
-Description: Estimates conditional choice probabilities for ordered discrete
-    outcomes using a single random forest with a joint splitting criterion
-    that minimises average estimation error across all classes simultaneously.
-    In contrast to the published 'ocf' package, which grows M separate
-    forests, 'jocf' grows one forest whose splitting rule is equivalent to
-    minimising total CART Gini impurity (Proposition 1 in the package vignette).
+Description: Estimates conditional choice probabilities and classifications
+    for ordered discrete outcomes using a single random forest with a joint
+    splitting criterion that minimises average estimation error across all
+    classes simultaneously.  In contrast to the published 'ocf' package,
+    which grows M separate forests, 'jocf' grows one forest whose splitting
+    rule is equivalent to minimising total CART Gini impurity (Proposition 1
+    in the package vignette).  The single-forest structure enables a
+    majority-vote classifier not available to multi-forest approaches.
 License: MIT + file LICENSE
 URL: https://github.com/riccardo-df/jocf
 BugReports: https://github.com/riccardo-df/jocf/issues

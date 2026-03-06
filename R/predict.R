@@ -15,9 +15,10 @@
 #'     `1, ..., M`):
 #'     \describe{
 #'       \item{`prob`}{Probability-based classification: argmax of forest-
-#'         averaged probabilities.}
+#'         averaged probabilities (see `vignette("jocf-theory")`).}
 #'       \item{`vote`}{Majority-vote classification: each tree votes for its
-#'         leaf argmax, then the class with the most votes wins.}
+#'         leaf argmax, then the class with the most votes wins.  Unique to
+#'         the unified OCF (see `vignette("jocf-theory")`).}
 #'     }}
 #' }
 #'

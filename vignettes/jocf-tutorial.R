@@ -26,17 +26,23 @@ head(fit$predictions)
 summary(rowSums(fit$predictions))
 
 
+## ----classification-----------------------------------------------------------
+## In-sample classifications
+table(fit$classification$prob)
+table(fit$classification$vote)
+
+
 ## ----predict------------------------------------------------------------------
 X_new <- matrix(rnorm(10 * 4), ncol = 4)
 preds <- predict(fit, X_new)
 
 ## Predicted probabilities (n_new x M matrix)
-preds$probabilities
+head(preds$probabilities)
 
-## Probability-based classification (argmax of averaged probs)
+## Probability-based classification
 preds$classification$prob
 
-## Majority-vote classification (unique to unified OCF)
+## Majority-vote classification
 preds$classification$vote
 
 

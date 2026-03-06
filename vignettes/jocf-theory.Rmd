@@ -157,6 +157,45 @@ $$
 By construction, $\hat{p}_m(w) \ge 0$ for all $m$ and
 $\sum_m \hat{p}_m(w) = 1$ — no normalisation is needed.
 
+## Classification
+
+The probability estimates $\hat{p}_m(w)$ can be used to classify each
+observation into a single class.  Two rules are natural, differing in what they
+aggregate across trees.
+
+### Probability-based classification
+
+The first rule takes the argmax of the forest-level probability estimates:
+
+$$
+\hat{Y}^P(w) = \underset{m \in \{1,\dots,M\}}{\arg\max}\; \hat{p}_m(w).
+$$
+
+This targets the conditional mode and minimises 0--1 loss with respect to the
+estimated distribution.  It is available to any estimator that produces class
+probability estimates, including the original OCF with $M$ separate forests.
+
+### Majority-vote classification
+
+The second rule exploits the single-forest structure of the unified OCF.  Since
+every tree $b$ produces a single leaf $L_b(w)$ covering all $M$ classes
+simultaneously, each tree can cast a well-defined vote:
+
+$$
+\hat{Y}_b(w) = \underset{m \in \{1,\dots,M\}}{\arg\max}\; \hat{p}_{m,b}(w).
+$$
+
+The forest-level majority-vote classifier then aggregates across trees:
+
+$$
+\hat{Y}^{MV}(w) = \underset{m \in \{1,\dots,M\}}{\arg\max}
+\;\sum_{b=1}^{B} \mathbf{1}\!\left(\hat{Y}_b(w) = m\right).
+$$
+
+This rule is **unique to the unified OCF**: the original OCF grows $M$
+independent forests with no common leaf structure, so no single tree spans all
+classes and majority vote is not defined.
+
 ## Marginal effects
 
 Following Lechner (2019), marginal effects are computed nonparametrically via

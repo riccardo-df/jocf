@@ -31,10 +31,10 @@
 #'     `1, ..., M`):
 #'     \describe{
 #'       \item{`prob`}{Probability-based classification: argmax of forest-
-#'         averaged probabilities (eq. 5 in the spec).}
+#'         averaged probabilities (see `vignette("jocf-theory")`).}
 #'       \item{`vote`}{Majority-vote classification: each tree votes for its
-#'         leaf argmax, then the class with the most votes wins (eq. 7 in
-#'         the spec). Unique to the unified OCF.}
+#'         leaf argmax, then the class with the most votes wins.  Unique to
+#'         the unified OCF (see `vignette("jocf-theory")`).}
 #'     }}
 #'   \item{`forest`}{List of B tree structures; used by [predict.jocf()].}
 #'   \item{`splitting.rule`}{Character; the splitting rule used.}
