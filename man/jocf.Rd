@@ -9,6 +9,7 @@ jocf(
   X,
   num.trees = 2000L,
   min.node.size = 5L,
+  max.depth = NULL,
   mtry = NULL,
   splitting.rule = "simple",
   honesty = FALSE,
@@ -26,6 +27,10 @@ discrete outcome.}
 
 \item{min.node.size}{Positive integer. Minimum number of observations in
 a terminal node. Default \code{5}.}
+
+\item{max.depth}{Positive integer or \code{NULL}. Maximum tree depth. \code{NULL}
+(default) grows trees without depth constraint. \code{max.depth = 1} produces
+stumps (a single split).}
 
 \item{mtry}{Positive integer or \code{NULL}. Number of features to consider at
 each split. Default \code{NULL} uses \code{floor(sqrt(ncol(X)))}.}

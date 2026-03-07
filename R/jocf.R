@@ -11,6 +11,9 @@
 #' @param num.trees Positive integer. Number of trees. Default `2000`.
 #' @param min.node.size Positive integer. Minimum number of observations in
 #'   a terminal node. Default `5`.
+#' @param max.depth Positive integer or `NULL`. Maximum tree depth. `NULL`
+#'   (default) grows trees without depth constraint. `max.depth = 1` produces
+#'   stumps (a single split).
 #' @param mtry Positive integer or `NULL`. Number of features to consider at
 #'   each split. Default `NULL` uses `floor(sqrt(ncol(X)))`.
 #' @param splitting.rule Character, one of `"simple"` (default) or
@@ -66,6 +69,7 @@ jocf <- function(Y,
                  X,
                  num.trees      = 2000L,
                  min.node.size  = 5L,
+                 max.depth      = NULL,
                  mtry           = NULL,
                  splitting.rule = "simple",
                  honesty        = FALSE,
@@ -75,13 +79,14 @@ jocf <- function(Y,
 
   Y <- as.integer(Y)
   X <- as.matrix(X)
-  validate_jocf_inputs(Y, X, num.trees, min.node.size, mtry,
+  validate_jocf_inputs(Y, X, num.trees, min.node.size, max.depth, mtry,
                        splitting.rule, honesty)
 
-  M    <- max(Y)
-  n    <- length(Y)
-  k    <- ncol(X)
-  mtry <- if (is.null(mtry)) floor(sqrt(k)) else as.integer(mtry)
+  M         <- max(Y)
+  n         <- length(Y)
+  k         <- ncol(X)
+  mtry      <- if (is.null(mtry)) floor(sqrt(k)) else as.integer(mtry)
+  max_depth <- if (is.null(max.depth)) -1L else as.integer(max.depth)
 
   lambda <- if (splitting.rule == "weighted") {
     compute_lambda(Y, M)
@@ -94,6 +99,7 @@ jocf <- function(Y,
     X             = X,
     num_trees     = as.integer(num.trees),
     min_node_size = as.integer(min.node.size),
+    max_depth     = max_depth,
     mtry          = as.integer(mtry),
     M             = as.integer(M),
     lambda        = lambda,
@@ -114,6 +120,7 @@ jocf <- function(Y,
       classification = list(prob = class_prob, vote = class_vote),
       forest         = forest_result$forest,
       splitting.rule = splitting.rule,
+      max.depth      = max.depth,
       M              = M,
       num.trees      = as.integer(num.trees),
       k              = k,

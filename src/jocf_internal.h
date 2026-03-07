@@ -164,6 +164,7 @@ SplitResult find_best_split_ranked(
 //   min_node_size — minimum observations per terminal node
 //   mtry       — number of candidate features per split
 //   rng        — per-tree Mersenne Twister
+//   max_depth  — maximum tree depth (-1 = unlimited)
 // ---------------------------------------------------------------------------
 TreeData grow_single_tree(
   const int*        y,
@@ -174,5 +175,6 @@ TreeData grow_single_tree(
   const double*     lambda,
   int               min_node_size,
   int               mtry,
-  std::mt19937&     rng
+  std::mt19937&     rng,
+  int               max_depth = -1
 );

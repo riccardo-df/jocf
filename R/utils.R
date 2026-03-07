@@ -17,6 +17,7 @@ resolve_num_threads <- function(num.threads) {
 #' @param X Matrix or data.frame of covariates.
 #' @param num.trees Positive integer number of trees.
 #' @param min.node.size Positive integer minimum node size.
+#' @param max.depth Positive integer or NULL (unlimited).
 #' @param mtry Positive integer; feature subsample size.
 #' @param splitting.rule Character, one of `"simple"` or `"weighted"`.
 #' @param honesty Logical; must be `FALSE` (not yet implemented).
@@ -24,7 +25,7 @@ resolve_num_threads <- function(num.threads) {
 #' @return Invisibly returns `NULL`. Stops with an informative message on
 #'   invalid input.
 #' @keywords internal
-validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, mtry,
+validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth, mtry,
                                   splitting.rule, honesty) {
   if (!is.integer(Y) && !all(Y == floor(Y)))
     stop("`Y` must be an integer vector.", call. = FALSE)
@@ -51,6 +52,11 @@ validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, mtry,
   if (!is.numeric(min.node.size) || length(min.node.size) != 1L ||
       min.node.size < 1L)
     stop("`min.node.size` must be a positive integer.", call. = FALSE)
+  if (!is.null(max.depth)) {
+    if (!is.numeric(max.depth) || length(max.depth) != 1L ||
+        max.depth < 1L || max.depth != floor(max.depth))
+      stop("`max.depth` must be a positive integer or NULL.", call. = FALSE)
+  }
   if (!is.null(mtry)) {
     if (!is.numeric(mtry) || length(mtry) != 1L || mtry < 1L ||
         mtry > ncol(X))

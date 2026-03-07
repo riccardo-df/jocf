@@ -34,7 +34,8 @@ TreeData grow_single_tree(
   const double*     lambda,
   int               min_node_size,
   int               mtry,
-  std::mt19937&     rng
+  std::mt19937&     rng,
+  int               max_depth    // -1 = unlimited
 ) {
   const int n = sort_data.n;
   const int k = sort_data.k;
@@ -72,6 +73,7 @@ TreeData grow_single_tree(
   std::vector<double> lp;   // leaf_probs row-major: [node_id * M + m]
   std::vector<int>    start_pos;  // node start in sample_ids (inclusive)
   std::vector<int>    end_pos;    // node end in sample_ids (exclusive)
+  std::vector<int>    node_depth; // depth of each node (root = 0)
 
   sf.reserve(reserve_sz);
   st.reserve(reserve_sz);
@@ -80,9 +82,10 @@ TreeData grow_single_tree(
   lp.reserve(static_cast<std::size_t>(reserve_sz) * M);
   start_pos.reserve(reserve_sz);
   end_pos.reserve(reserve_sz);
+  node_depth.reserve(reserve_sz);
 
   // Allocate one new node; returns its 0-based index.
-  auto alloc_node = [&](int s, int e) -> int {
+  auto alloc_node = [&](int s, int e, int depth) -> int {
     int id = static_cast<int>(sf.size());
     sf.push_back(0);
     st.push_back(0.0);
@@ -91,11 +94,12 @@ TreeData grow_single_tree(
     for (int m = 0; m < M; ++m) lp.push_back(0.0);
     start_pos.push_back(s);
     end_pos.push_back(e);
+    node_depth.push_back(depth);
     return id;
   };
 
   // ----- BFS growing -------------------------------------------------------
-  alloc_node(0, n_boot);  // root node
+  alloc_node(0, n_boot, 0);  // root node (depth 0)
   int n_nodes = 1;
   int cursor  = 0;
 
@@ -107,6 +111,14 @@ TreeData grow_single_tree(
     // Class counts for this node
     std::fill(node_counts.begin(), node_counts.end(), 0);
     for (int i = s; i < e; ++i) node_counts[y[sample_ids[i]]]++;
+
+    // Check depth limit
+    if (max_depth > 0 && node_depth[cursor] >= max_depth) {
+      for (int m = 0; m < M; ++m)
+        lp[cursor * M + m] = static_cast<double>(node_counts[m]) / n_obs;
+      ++cursor;
+      continue;
+    }
 
     // Check if too small to split
     if (n_obs < 2 * min_node_size) {
@@ -161,8 +173,9 @@ TreeData grow_single_tree(
     }
 
     // Allocate children
-    int left_id  = alloc_node(s, mid);
-    int right_id = alloc_node(mid, e);
+    int child_depth = node_depth[cursor] + 1;
+    int left_id  = alloc_node(s, mid, child_depth);
+    int right_id = alloc_node(mid, e, child_depth);
     lc[cursor] = left_id;
     rc[cursor] = right_id;
     n_nodes += 2;

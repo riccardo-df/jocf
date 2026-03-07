@@ -135,6 +135,7 @@ static std::vector<double> to_rowmaj(const arma::mat& x) {
 //' @param X Numeric matrix of covariates (n x k).
 //' @param num_trees Number of trees.
 //' @param min_node_size Minimum observations per terminal node.
+//' @param max_depth Maximum tree depth (-1 = unlimited).
 //' @param mtry Number of candidate features at each split.
 //' @param M Number of outcome classes.
 //' @param lambda Numeric weight vector of length M.
@@ -150,6 +151,7 @@ Rcpp::List grow_forest_cpp(
   Rcpp::NumericMatrix X,
   int                 num_trees,
   int                 min_node_size,
+  int                 max_depth,
   int                 mtry,
   int                 M,
   Rcpp::NumericVector lambda,
@@ -247,7 +249,7 @@ Rcpp::List grow_forest_cpp(
       native_forest[b] = grow_single_tree(
         y_vec.data(), sort_data,
         boot_indices[b].data(), n,
-        M, lam_raw, min_node_size, mtry, rng
+        M, lam_raw, min_node_size, mtry, rng, max_depth
       );
       const TreeData& td   = native_forest[b];
       const double*   xr   = x_rowmaj.data();
@@ -282,7 +284,7 @@ Rcpp::List grow_forest_cpp(
     native_forest[b] = grow_single_tree(
       y_vec.data(), sort_data,
       boot_indices[b].data(), n,
-      M, lam_raw, min_node_size, mtry, rng
+      M, lam_raw, min_node_size, mtry, rng, max_depth
     );
     const TreeData& td   = native_forest[b];
     const double*   xr   = x_rowmaj.data();

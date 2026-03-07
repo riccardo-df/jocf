@@ -127,3 +127,60 @@ test_that("predict.jocf: error on wrong number of columns", {
   X_bad <- matrix(rnorm(10 * 3), 10, 3)   # 3 cols instead of 4
   expect_error(predict(fit, newdata = X_bad), regexp = "4 column")
 })
+
+# ---------------------------------------------------------------------------
+# max.depth
+# ---------------------------------------------------------------------------
+
+test_that("jocf: max.depth = 1 produces stumps (at most 3 nodes per tree)", {
+  d   <- make_data(n = 200, M = 3, k = 4, seed = 30)
+  fit <- jocf(d$Y, d$X, num.trees = 50, max.depth = 1)
+  for (b in seq_along(fit$forest)) {
+    tree <- fit$forest[[b]]
+    expect_lte(length(tree$split_feature), 3L)
+  }
+  # Predictions still valid
+  expect_equal(rowSums(fit$predictions), rep(1, d$n), tolerance = 1e-10)
+  expect_true(all(fit$predictions >= 0))
+})
+
+test_that("jocf: max.depth = 2 produces at most 7 nodes per tree", {
+  d   <- make_data(n = 200, M = 3, k = 4, seed = 31)
+  fit <- jocf(d$Y, d$X, num.trees = 50, max.depth = 2)
+  for (b in seq_along(fit$forest)) {
+    tree <- fit$forest[[b]]
+    expect_lte(length(tree$split_feature), 7L)
+  }
+  expect_equal(rowSums(fit$predictions), rep(1, d$n), tolerance = 1e-10)
+  expect_true(all(fit$predictions >= 0))
+})
+
+test_that("jocf: max.depth = NULL (default) grows deeper trees than max.depth = 1", {
+  d    <- make_data(n = 200, M = 3, k = 4, seed = 32)
+  fit1 <- jocf(d$Y, d$X, num.trees = 50, max.depth = 1)
+  fit0 <- jocf(d$Y, d$X, num.trees = 50)
+  # Default should have more nodes on average
+  avg_nodes_1 <- mean(vapply(fit1$forest, function(t) length(t$split_feature), 1L))
+  avg_nodes_0 <- mean(vapply(fit0$forest, function(t) length(t$split_feature), 1L))
+  expect_gt(avg_nodes_0, avg_nodes_1)
+})
+
+test_that("jocf: max.depth stored in returned object", {
+  d   <- make_data(n = 60, M = 2, k = 3, seed = 33)
+  fit <- jocf(d$Y, d$X, num.trees = 10, max.depth = 3)
+  expect_equal(fit$max.depth, 3L)
+  fit2 <- jocf(d$Y, d$X, num.trees = 10)
+  expect_null(fit2$max.depth)
+})
+
+test_that("jocf: max.depth validation rejects invalid values", {
+  d <- make_data(n = 60, M = 2, k = 3, seed = 34)
+  expect_error(jocf(d$Y, d$X, num.trees = 10, max.depth = 0),
+               "positive integer")
+  expect_error(jocf(d$Y, d$X, num.trees = 10, max.depth = -1),
+               "positive integer")
+  expect_error(jocf(d$Y, d$X, num.trees = 10, max.depth = 1.5),
+               "positive integer")
+  expect_error(jocf(d$Y, d$X, num.trees = 10, max.depth = "abc"),
+               "positive integer")
+})
