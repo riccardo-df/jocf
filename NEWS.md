@@ -1,5 +1,10 @@
 # jocf 0.0.0.9000
 
+* **Built-in hyperparameter tuning**: `jocf(..., tune.parameters = "all")`
+  tunes `mtry`, `min.node.size`, and `sample.fraction` via GRF-style debiased
+  OOB error and a Kriging surrogate (`DiceKriging`).  New arguments:
+  `tune.parameters`, `tune.num.trees`, `tune.num.reps`, `tune.num.draws`.
+  Tuning results stored in `$tuning.output`.
 * Initial implementation of the joint ordered correlation forest estimator.
 * Core functions: `jocf()`, `predict.jocf()`, `marginal_effects.jocf()`.
 * Joint splitting criterion: unweighted (`"simple"`) and variance-weighted

@@ -62,6 +62,7 @@ me
 - **Joint splitting criterion**: one forest for all *M* classes, equivalent to average Gini impurity.
 - **Two classification rules**: probability-based (argmax of averaged probabilities) and majority-vote (per-tree argmax aggregation, unique to the unified OCF).
 - **Weighted splitting**: optional variance-weighted criterion (`splitting.rule = "weighted"`) to equalise contribution of rare classes.
+- **Built-in hyperparameter tuning**: GRF-style tuning of `mtry`, `min.node.size`, and `sample.fraction` via debiased OOB error and a Kriging surrogate (`tune.parameters = "all"`).
 - **OpenMP parallelism**: tree growing, prediction, and marginal effects are parallelised via OpenMP.
 - **Nonparametric marginal effects**: finite-difference estimator following Lechner (2019), with support for continuous and discrete covariates.
 

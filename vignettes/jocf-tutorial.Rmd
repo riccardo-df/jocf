@@ -142,6 +142,36 @@ head(fit_w$predictions)
 
 See `vignette("jocf-theory")` for the mathematical derivation.
 
+## Hyperparameter tuning
+
+`jocf()` includes a built-in tuning mechanism inspired by `grf`.  Setting
+`tune.parameters = "all"` tunes `mtry`, `min.node.size`, and
+`sample.fraction` before growing the full forest.  The procedure grows many
+small "mini-forests" at random parameter draws, computes debiased OOB error,
+fits a Kriging surrogate (via `DiceKriging`), and selects the best parameters.
+
+```{r tune, eval = requireNamespace("DiceKriging", quietly = TRUE)}
+fit_tuned <- jocf(Y, X, num.trees = 100,
+                  tune.parameters = "all",
+                  tune.num.trees = 10,
+                  tune.num.reps = 30,
+                  tune.num.draws = 200)
+
+## Selected parameters
+fit_tuned$tuning.output$params
+
+## Tuning status
+fit_tuned$tuning.output$status
+```
+
+You can also tune a subset of parameters:
+
+```{r tune_subset, eval = requireNamespace("DiceKriging", quietly = TRUE)}
+fit_mtry <- jocf(Y, X, num.trees = 100,
+                 tune.parameters = c("mtry"))
+fit_mtry$tuning.output$params$mtry
+```
+
 ## Parallelism
 
 Tree growing, prediction, and marginal effects are parallelised via OpenMP.

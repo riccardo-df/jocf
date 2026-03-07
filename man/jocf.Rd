@@ -13,6 +13,10 @@ jocf(
   sample.fraction = 0.5,
   mtry = NULL,
   splitting.rule = "simple",
+  tune.parameters = "none",
+  tune.num.trees = 50L,
+  tune.num.reps = 100L,
+  tune.num.draws = 1000L,
   honesty = FALSE,
   num.threads = NULL,
   ...
@@ -48,6 +52,24 @@ each split. Default \code{NULL} uses \code{floor(sqrt(ncol(X)))}.}
 \code{"weighted"} standardises each class by its population-level Bernoulli
 variance (see \code{vignette("jocf")}).}
 
+\item{tune.parameters}{Character. \code{"none"} (default) disables tuning.
+\code{"all"} tunes \code{mtry}, \code{min.node.size}, and \code{sample.fraction}.
+Alternatively, a character vector naming which parameters to tune
+(any subset of \code{c("mtry", "min.node.size", "sample.fraction")}).
+Tuning follows the GRF approach: many small mini-forests are evaluated
+at random parameter draws, a Kriging surrogate is fitted, and the
+parameters with the lowest predicted debiased OOB error are selected
+before growing the full forest.  Requires the \pkg{DiceKriging} package.}
+
+\item{tune.num.trees}{Positive integer. Number of trees per mini-forest
+during tuning. Default \code{50}.}
+
+\item{tune.num.reps}{Positive integer. Number of random parameter draws
+to evaluate with mini-forests. Default \code{100}.}
+
+\item{tune.num.draws}{Positive integer. Number of new random candidates
+evaluated via the Kriging surrogate. Default \code{1000}.}
+
 \item{honesty}{Logical. Must be \code{FALSE}; \code{TRUE} is not yet implemented.}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads to
@@ -76,6 +98,10 @@ the unified OCF (see \code{vignette("jocf-theory")}).}
 \item{\code{M}}{Integer; number of outcome classes.}
 \item{\code{num.trees}}{Integer; number of trees grown.}
 \item{\code{k}}{Integer; number of training covariates.}
+\item{\code{tuning.output}}{\code{NULL} when tuning is off, otherwise a named list
+with components \code{status} (\code{"tuned"}, \code{"default"}, or \code{"failure"}),
+\code{params} (selected parameter values), \code{error} (debiased OOB error),
+and \code{grid} (data frame of evaluated draws and errors).}
 \item{\code{call}}{The matched call.}
 }
 }
@@ -106,5 +132,17 @@ table(fit$classification$vote)   # majority-vote
 X_mixed <- data.frame(x1 = rnorm(n), x2 = factor(sample(c("A","B"), n, TRUE)))
 fit2 <- jocf(Y, X_mixed, num.trees = 50)
 head(fit2$predictions)
+
+\donttest{
+## Built-in hyperparameter tuning (requires DiceKriging)
+if (requireNamespace("DiceKriging", quietly = TRUE)) {
+  fit_tuned <- jocf(Y, X, num.trees = 50,
+                    tune.parameters = "all",
+                    tune.num.trees = 10,
+                    tune.num.reps = 20,
+                    tune.num.draws = 50)
+  fit_tuned$tuning.output$params
+}
+}
 
 }

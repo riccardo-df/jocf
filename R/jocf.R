@@ -26,6 +26,20 @@
 #'   `"weighted"`. `"simple"` uses equal weights across classes;
 #'   `"weighted"` standardises each class by its population-level Bernoulli
 #'   variance (see `vignette("jocf")`).
+#' @param tune.parameters Character. `"none"` (default) disables tuning.
+#'   `"all"` tunes `mtry`, `min.node.size`, and `sample.fraction`.
+#'   Alternatively, a character vector naming which parameters to tune
+#'   (any subset of `c("mtry", "min.node.size", "sample.fraction")`).
+#'   Tuning follows the GRF approach: many small mini-forests are evaluated
+#'   at random parameter draws, a Kriging surrogate is fitted, and the
+#'   parameters with the lowest predicted debiased OOB error are selected
+#'   before growing the full forest.  Requires the \pkg{DiceKriging} package.
+#' @param tune.num.trees Positive integer. Number of trees per mini-forest
+#'   during tuning. Default `50`.
+#' @param tune.num.reps Positive integer. Number of random parameter draws
+#'   to evaluate with mini-forests. Default `100`.
+#' @param tune.num.draws Positive integer. Number of new random candidates
+#'   evaluated via the Kriging surrogate. Default `1000`.
 #' @param honesty Logical. Must be `FALSE`; `TRUE` is not yet implemented.
 #' @param num.threads Positive integer or `NULL`. Number of OpenMP threads to
 #'   use when growing trees and computing in-sample predictions. `NULL`
@@ -51,6 +65,10 @@
 #'   \item{`M`}{Integer; number of outcome classes.}
 #'   \item{`num.trees`}{Integer; number of trees grown.}
 #'   \item{`k`}{Integer; number of training covariates.}
+#'   \item{`tuning.output`}{`NULL` when tuning is off, otherwise a named list
+#'     with components `status` (`"tuned"`, `"default"`, or `"failure"`),
+#'     `params` (selected parameter values), `error` (debiased OOB error),
+#'     and `grid` (data frame of evaluated draws and errors).}
 #'   \item{`call`}{The matched call.}
 #' }
 #'
@@ -76,17 +94,33 @@
 #' fit2 <- jocf(Y, X_mixed, num.trees = 50)
 #' head(fit2$predictions)
 #'
+#' \donttest{
+#' ## Built-in hyperparameter tuning (requires DiceKriging)
+#' if (requireNamespace("DiceKriging", quietly = TRUE)) {
+#'   fit_tuned <- jocf(Y, X, num.trees = 50,
+#'                     tune.parameters = "all",
+#'                     tune.num.trees = 10,
+#'                     tune.num.reps = 20,
+#'                     tune.num.draws = 50)
+#'   fit_tuned$tuning.output$params
+#' }
+#' }
+#'
 #' @export
 jocf <- function(Y,
                  X,
-                 num.trees       = 2000L,
-                 min.node.size   = 5L,
-                 max.depth       = NULL,
-                 sample.fraction = 0.5,
-                 mtry            = NULL,
-                 splitting.rule  = "simple",
-                 honesty         = FALSE,
-                 num.threads     = NULL,
+                 num.trees        = 2000L,
+                 min.node.size    = 5L,
+                 max.depth        = NULL,
+                 sample.fraction  = 0.5,
+                 mtry             = NULL,
+                 splitting.rule   = "simple",
+                 tune.parameters  = "none",
+                 tune.num.trees   = 50L,
+                 tune.num.reps    = 100L,
+                 tune.num.draws   = 1000L,
+                 honesty          = FALSE,
+                 num.threads      = NULL,
                  ...) {
   cl <- match.call()
 
@@ -110,6 +144,37 @@ jocf <- function(Y,
     compute_lambda(Y, M)
   } else {
     rep(1.0, M)
+  }
+
+  # Hyperparameter tuning
+  tune_params <- validate_tune_inputs(tune.parameters, tune.num.trees,
+                                      tune.num.reps, tune.num.draws)
+  tuning_output <- NULL
+
+  if (length(tune_params) > 0L) {
+    defaults <- list(
+      mtry            = as.integer(mtry),
+      min.node.size   = as.integer(min.node.size),
+      sample.fraction = sample.fraction
+    )
+    tuning_output <- tune_jocf(
+      Y              = Y,
+      X_mat          = X_mat,
+      M              = M,
+      tune_params    = tune_params,
+      defaults       = defaults,
+      tune.num.trees = as.integer(tune.num.trees),
+      tune.num.reps  = as.integer(tune.num.reps),
+      tune.num.draws = as.integer(tune.num.draws),
+      max_depth      = max_depth,
+      lambda         = lambda,
+      num_threads    = resolve_num_threads(num.threads)
+    )
+    # Override parameters with tuned values
+    mtry            <- as.integer(tuning_output$params$mtry)
+    min.node.size   <- as.integer(tuning_output$params$min.node.size)
+    sample.fraction <- tuning_output$params$sample.fraction
+    n_sub           <- as.integer(ceiling(sample.fraction * n))
   }
 
   forest_result <- grow_forest_cpp(
@@ -146,6 +211,7 @@ jocf <- function(Y,
       k              = k,
       factor_info     = fi,
       col_names       = colnames(X_mat),
+      tuning.output   = tuning_output,
       call           = cl
     ),
     class = "jocf"

@@ -24,6 +24,23 @@ grow_forest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub, mt
     .Call(`_jocf_grow_forest_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads)
 }
 
+#' Grow a forest and compute debiased OOB error
+#'
+#' Variant of [grow_forest_cpp()] used by the built-in hyperparameter tuning
+#' engine.  Instead of in-sample predictions and forest serialisation, this
+#' function accumulates out-of-bag (OOB) predictions and returns a debiased
+#' mean squared error scalar.  No forest or vote data is returned.
+#'
+#' @inheritParams grow_forest_cpp
+#'
+#' @return Named list: `oob_predictions` (n x M matrix, NaN where
+#'   oob_count == 0), `debiased_error` (scalar).
+#' @keywords internal
+#' @export
+grow_forest_oob_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads = 0L) {
+    .Call(`_jocf_grow_forest_oob_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads)
+}
+
 #' Predict class probabilities from a fitted jocf forest
 #'
 #' Internal C++ engine called by [predict.jocf()].

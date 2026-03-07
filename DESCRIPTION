@@ -27,6 +27,7 @@ LinkingTo:
     RcppArmadillo
 Suggests:
     testthat (>= 3.0.0),
+    DiceKriging,
     knitr,
     rmarkdown
 VignetteBuilder: knitr

@@ -336,6 +336,216 @@ Rcpp::List grow_forest_cpp(
 }
 
 // ===========================================================================
+// grow_forest_oob_cpp (exported) — OOB error for hyperparameter tuning
+// ===========================================================================
+
+//' Grow a forest and compute debiased OOB error
+//'
+//' Variant of [grow_forest_cpp()] used by the built-in hyperparameter tuning
+//' engine.  Instead of in-sample predictions and forest serialisation, this
+//' function accumulates out-of-bag (OOB) predictions and returns a debiased
+//' mean squared error scalar.  No forest or vote data is returned.
+//'
+//' @inheritParams grow_forest_cpp
+//'
+//' @return Named list: `oob_predictions` (n x M matrix, NaN where
+//'   oob_count == 0), `debiased_error` (scalar).
+//' @keywords internal
+//' @export
+// [[Rcpp::export]]
+Rcpp::List grow_forest_oob_cpp(
+  Rcpp::IntegerVector Y,
+  Rcpp::NumericMatrix X,
+  int                 num_trees,
+  int                 min_node_size,
+  int                 max_depth,
+  int                 n_sub,
+  int                 mtry,
+  int                 M,
+  Rcpp::NumericVector lambda,
+  int                 num_threads = 0
+) {
+  const int n = Y.size();
+
+  // Convert Y to 0-indexed plain int vector
+  std::vector<int> y_vec(n);
+  for (int i = 0; i < n; ++i) y_vec[i] = Y[i] - 1;
+
+  const arma::mat x = Rcpp::as<arma::mat>(X);
+  const int k       = static_cast<int>(x.n_cols);
+
+  const double* lam_raw = lambda.begin();
+
+  // Pre-transpose X to row-major for tree traversal
+  const std::vector<double> x_rowmaj = to_rowmaj(x);
+
+  // --- Phase 0: Global pre-sort (identical to grow_forest_cpp) ---
+  SortData sort_data;
+  sort_data.n    = n;
+  sort_data.k    = k;
+  sort_data.x_cm = x.memptr();
+  sort_data.index_data.resize(static_cast<std::size_t>(k) * n);
+  sort_data.unique_values.resize(k);
+  sort_data.n_unique.resize(k);
+
+  {
+    std::vector<std::pair<double, int>> val_idx(n);
+    for (int j = 0; j < k; ++j) {
+      const double* col = sort_data.x_cm + static_cast<std::ptrdiff_t>(j) * n;
+      for (int i = 0; i < n; ++i) val_idx[i] = {col[i], i};
+      std::sort(val_idx.begin(), val_idx.end());
+
+      sort_data.unique_values[j].clear();
+      sort_data.unique_values[j].push_back(val_idx[0].first);
+      int rank = 0;
+      sort_data.index_data[static_cast<std::ptrdiff_t>(j) * n
+                           + val_idx[0].second] = 0;
+      for (int i = 1; i < n; ++i) {
+        if (val_idx[i].first > val_idx[i - 1].first) {
+          sort_data.unique_values[j].push_back(val_idx[i].first);
+          ++rank;
+        }
+        sort_data.index_data[static_cast<std::ptrdiff_t>(j) * n
+                             + val_idx[i].second] = rank;
+      }
+      sort_data.n_unique[j] = rank + 1;
+    }
+  }
+
+  // --- Phase 1: Sequential R-RNG seeds + bootstrap ---
+  Rcpp::NumericVector seed_doubles = Rcpp::runif(num_trees, 0.0, 4294967295.0);
+  std::vector<uint32_t> tree_seeds(num_trees);
+  for (int b = 0; b < num_trees; ++b)
+    tree_seeds[b] = static_cast<uint32_t>(seed_doubles[b]);
+
+  // Subsample without replacement; also build in_bag flags for OOB
+  std::vector<std::vector<int>> boot_indices(num_trees);
+  std::vector<std::vector<bool>> in_bag_flags(num_trees);
+  for (int b = 0; b < num_trees; ++b) {
+    Rcpp::IntegerVector boot_r = Rcpp::sample(n, n_sub, /*replace=*/false) - 1;
+    boot_indices[b].assign(boot_r.begin(), boot_r.end());
+    in_bag_flags[b].assign(n, false);
+    for (int s = 0; s < n_sub; ++s)
+      in_bag_flags[b][boot_indices[b][s]] = true;
+  }
+
+  // --- Phase 2: Parallel tree growing + OOB accumulation ---
+  // OOB accumulators: sum of predictions, sum of squared predictions, count
+  std::vector<double> oob_pred(static_cast<std::size_t>(n) * M, 0.0);
+  std::vector<double> oob_pred_sq(static_cast<std::size_t>(n) * M, 0.0);
+  std::vector<int>    oob_count(n, 0);
+
+#ifdef _OPENMP
+  const int nt_grow = (num_threads > 0) ? num_threads : omp_get_max_threads();
+#pragma omp parallel num_threads(nt_grow)
+  {
+    std::vector<double> local_pred(static_cast<std::size_t>(n) * M, 0.0);
+    std::vector<double> local_pred_sq(static_cast<std::size_t>(n) * M, 0.0);
+    std::vector<int>    local_count(n, 0);
+
+#pragma omp for schedule(dynamic, 4)
+    for (int b = 0; b < num_trees; ++b) {
+      std::mt19937 rng(tree_seeds[b]);
+      TreeData td = grow_single_tree(
+        y_vec.data(), sort_data,
+        boot_indices[b].data(), n_sub,
+        M, lam_raw, min_node_size, mtry, rng, max_depth
+      );
+      const double*      xr  = x_rowmaj.data();
+      const std::vector<bool>& ib = in_bag_flags[b];
+
+      for (int i = 0; i < n; ++i) {
+        if (ib[i]) continue;  // skip in-bag observations
+        const double* xi   = xr + static_cast<std::ptrdiff_t>(i) * k;
+        const int     leaf = traverse_native(td, xi);
+        const double* lp   = td.leaf_probs.data() + leaf * M;
+        double*       acc  = local_pred.data() + static_cast<std::ptrdiff_t>(i) * M;
+        double*       acc2 = local_pred_sq.data() + static_cast<std::ptrdiff_t>(i) * M;
+        for (int m = 0; m < M; ++m) {
+          acc[m]  += lp[m];
+          acc2[m] += lp[m] * lp[m];
+        }
+        local_count[i] += 1;
+      }
+    }
+
+#pragma omp critical
+    {
+      for (std::size_t idx = 0; idx < local_pred.size(); ++idx) {
+        oob_pred[idx]    += local_pred[idx];
+        oob_pred_sq[idx] += local_pred_sq[idx];
+      }
+      for (int i = 0; i < n; ++i)
+        oob_count[i] += local_count[i];
+    }
+  }
+#else
+  for (int b = 0; b < num_trees; ++b) {
+    std::mt19937 rng(tree_seeds[b]);
+    TreeData td = grow_single_tree(
+      y_vec.data(), sort_data,
+      boot_indices[b].data(), n_sub,
+      M, lam_raw, min_node_size, mtry, rng, max_depth
+    );
+    const double*      xr  = x_rowmaj.data();
+    const std::vector<bool>& ib = in_bag_flags[b];
+
+    for (int i = 0; i < n; ++i) {
+      if (ib[i]) continue;
+      const double* xi   = xr + static_cast<std::ptrdiff_t>(i) * k;
+      const int     leaf = traverse_native(td, xi);
+      const double* lp   = td.leaf_probs.data() + leaf * M;
+      double*       acc  = oob_pred.data() + static_cast<std::ptrdiff_t>(i) * M;
+      double*       acc2 = oob_pred_sq.data() + static_cast<std::ptrdiff_t>(i) * M;
+      for (int m = 0; m < M; ++m) {
+        acc[m]  += lp[m];
+        acc2[m] += lp[m] * lp[m];
+      }
+      oob_count[i] += 1;
+    }
+  }
+#endif
+
+  // --- Compute OOB predictions and debiased error ---
+  Rcpp::NumericMatrix oob_preds_r(n, M);
+  double total_debiased = 0.0;
+  int    n_valid = 0;
+
+  for (int i = 0; i < n; ++i) {
+    if (oob_count[i] < 2) {
+      // Not enough OOB trees for variance estimate
+      for (int m = 0; m < M; ++m) oob_preds_r(i, m) = R_NaN;
+      continue;
+    }
+    const double cnt    = static_cast<double>(oob_count[i]);
+    double raw_mse_i    = 0.0;
+    double variance_i   = 0.0;
+
+    for (int m = 0; m < M; ++m) {
+      const std::size_t idx = static_cast<std::size_t>(i) * M + m;
+      const double mean_p   = oob_pred[idx] / cnt;
+      oob_preds_r(i, m)     = mean_p;
+      const double indicator = (y_vec[i] == m) ? 1.0 : 0.0;
+      raw_mse_i    += (indicator - mean_p) * (indicator - mean_p);
+      variance_i   += (oob_pred_sq[idx] / cnt - mean_p * mean_p);
+    }
+    // Bessel correction for variance
+    variance_i *= cnt / (cnt - 1.0);
+    total_debiased += raw_mse_i - variance_i;
+    ++n_valid;
+  }
+
+  const double debiased_error = (n_valid > 0)
+    ? total_debiased / static_cast<double>(n_valid)
+    : R_NaN;
+
+  return Rcpp::List::create(
+    Rcpp::Named("oob_predictions") = oob_preds_r,
+    Rcpp::Named("debiased_error")  = debiased_error
+  );
+}
+
+// ===========================================================================
 // predict_forest_cpp (exported)
 // ===========================================================================
 
