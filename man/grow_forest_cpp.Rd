@@ -10,6 +10,7 @@ grow_forest_cpp(
   num_trees,
   min_node_size,
   max_depth,
+  n_sub,
   mtry,
   M,
   lambda,
@@ -26,6 +27,8 @@ grow_forest_cpp(
 \item{min_node_size}{Minimum observations per terminal node.}
 
 \item{max_depth}{Maximum tree depth (-1 = unlimited).}
+
+\item{n_sub}{Subsample size (drawn without replacement).}
 
 \item{mtry}{Number of candidate features at each split.}
 

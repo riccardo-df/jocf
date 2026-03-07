@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // grow_forest_cpp
-Rcpp::List grow_forest_cpp(Rcpp::IntegerVector Y, Rcpp::NumericMatrix X, int num_trees, int min_node_size, int max_depth, int mtry, int M, Rcpp::NumericVector lambda, int num_threads);
-RcppExport SEXP _jocf_grow_forest_cpp(SEXP YSEXP, SEXP XSEXP, SEXP num_treesSEXP, SEXP min_node_sizeSEXP, SEXP max_depthSEXP, SEXP mtrySEXP, SEXP MSEXP, SEXP lambdaSEXP, SEXP num_threadsSEXP) {
+Rcpp::List grow_forest_cpp(Rcpp::IntegerVector Y, Rcpp::NumericMatrix X, int num_trees, int min_node_size, int max_depth, int n_sub, int mtry, int M, Rcpp::NumericVector lambda, int num_threads);
+RcppExport SEXP _jocf_grow_forest_cpp(SEXP YSEXP, SEXP XSEXP, SEXP num_treesSEXP, SEXP min_node_sizeSEXP, SEXP max_depthSEXP, SEXP n_subSEXP, SEXP mtrySEXP, SEXP MSEXP, SEXP lambdaSEXP, SEXP num_threadsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -22,11 +22,12 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type num_trees(num_treesSEXP);
     Rcpp::traits::input_parameter< int >::type min_node_size(min_node_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type max_depth(max_depthSEXP);
+    Rcpp::traits::input_parameter< int >::type n_sub(n_subSEXP);
     Rcpp::traits::input_parameter< int >::type mtry(mtrySEXP);
     Rcpp::traits::input_parameter< int >::type M(MSEXP);
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type lambda(lambdaSEXP);
     Rcpp::traits::input_parameter< int >::type num_threads(num_threadsSEXP);
-    rcpp_result_gen = Rcpp::wrap(grow_forest_cpp(Y, X, num_trees, min_node_size, max_depth, mtry, M, lambda, num_threads));
+    rcpp_result_gen = Rcpp::wrap(grow_forest_cpp(Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -92,7 +93,7 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_jocf_grow_forest_cpp", (DL_FUNC) &_jocf_grow_forest_cpp, 9},
+    {"_jocf_grow_forest_cpp", (DL_FUNC) &_jocf_grow_forest_cpp, 10},
     {"_jocf_predict_forest_cpp", (DL_FUNC) &_jocf_predict_forest_cpp, 4},
     {"_jocf_marginal_effects_cpp", (DL_FUNC) &_jocf_marginal_effects_cpp, 7},
     {"_jocf_node_impurity_cpp", (DL_FUNC) &_jocf_node_impurity_cpp, 4},

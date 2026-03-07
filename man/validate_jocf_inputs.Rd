@@ -10,6 +10,7 @@ validate_jocf_inputs(
   num.trees,
   min.node.size,
   max.depth,
+  sample.fraction,
   mtry,
   splitting.rule,
   honesty
@@ -25,6 +26,8 @@ validate_jocf_inputs(
 \item{min.node.size}{Positive integer minimum node size.}
 
 \item{max.depth}{Positive integer or NULL (unlimited).}
+
+\item{sample.fraction}{Numeric in (0, 1]; subsample fraction.}
 
 \item{mtry}{Positive integer; feature subsample size.}
 

@@ -1,8 +1,10 @@
 #' Predict class probabilities and classifications from a fitted jocf object
 #'
 #' @param object A fitted object of class `"jocf"`.
-#' @param newdata Numeric matrix or data.frame with the same number of
-#'   columns as the training `X`.
+#' @param newdata Matrix or data.frame with the same number of columns and
+#'   column types as the training `X`.  Factor and logical columns are
+#'   re-encoded using the level ordering stored at training time.  Unseen
+#'   factor levels produce a warning and are mapped to the median code.
 #' @param num.threads Positive integer or `NULL`. Number of OpenMP threads.
 #'   `NULL` (default) uses all available cores.
 #' @param ... Currently unused.
@@ -42,9 +44,9 @@ predict.jocf <- function(object, newdata, num.threads = NULL, ...) {
   if (!inherits(object, "jocf"))
     stop('`object` must be of class "jocf".', call. = FALSE)
 
-  newdata <- as.matrix(newdata)
-  if (!is.numeric(newdata))
-    stop("`newdata` must be numeric.", call. = FALSE)
+  # Encode factors using stored training-time metadata
+  encoded <- encode_factors(newdata, factor_info = object$factor_info)
+  newdata <- encoded$X_encoded
   if (ncol(newdata) != object$k)
     stop(sprintf("`newdata` must have %d column(s) (same as training X).",
                  object$k), call. = FALSE)

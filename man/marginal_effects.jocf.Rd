@@ -75,6 +75,11 @@ where \eqn{\hat{\sigma}_j} is the sample standard deviation of covariate
 
 The AME for covariate \eqn{j} and class \eqn{m} is the average of these
 individual effects over all evaluation points.
+
+Factor and logical covariates are automatically excluded because finite
+differences are not meaningful for categorical variables.  A \code{message()} is
+printed when columns are excluded; explicitly requesting a factor column via
+\code{target_covariates} produces a \code{warning()}.
 }
 \examples{
 ## Simulate data and fit a forest

@@ -10,6 +10,7 @@ jocf(
   num.trees = 2000L,
   min.node.size = 5L,
   max.depth = NULL,
+  sample.fraction = 0.5,
   mtry = NULL,
   splitting.rule = "simple",
   honesty = FALSE,
@@ -21,7 +22,11 @@ jocf(
 \item{Y}{Integer vector with values in \verb{\{1, ..., M\}} giving the ordered
 discrete outcome.}
 
-\item{X}{Numeric matrix or data.frame of covariates (n x k).}
+\item{X}{Matrix or data.frame of covariates (n x k). Columns may be numeric,
+factor (ordered or unordered), or logical.  Unordered factor levels are
+internally sorted by \code{mean(Y)} and encoded as integer codes; ordered factors
+use their existing level order.  Character columns are not accepted; convert
+to factor first.}
 
 \item{num.trees}{Positive integer. Number of trees. Default \code{2000}.}
 
@@ -31,6 +36,9 @@ a terminal node. Default \code{5}.}
 \item{max.depth}{Positive integer or \code{NULL}. Maximum tree depth. \code{NULL}
 (default) grows trees without depth constraint. \code{max.depth = 1} produces
 stumps (a single split).}
+
+\item{sample.fraction}{Numeric in \verb{(0, 1]}. Fraction of observations to
+draw \strong{without replacement} for each tree. Default \code{0.5}.}
 
 \item{mtry}{Positive integer or \code{NULL}. Number of features to consider at
 each split. Default \code{NULL} uses \code{floor(sqrt(ncol(X)))}.}
@@ -64,6 +72,7 @@ the unified OCF (see \code{vignette("jocf-theory")}).}
 }}
 \item{\code{forest}}{List of B tree structures; used by \code{\link[=predict.jocf]{predict.jocf()}}.}
 \item{\code{splitting.rule}}{Character; the splitting rule used.}
+\item{\code{sample.fraction}}{Numeric; the subsample fraction used.}
 \item{\code{M}}{Integer; number of outcome classes.}
 \item{\code{num.trees}}{Integer; number of trees grown.}
 \item{\code{k}}{Integer; number of training covariates.}
@@ -92,5 +101,10 @@ head(fit$predictions)
 ## Classifications
 table(fit$classification$prob)   # probability-based
 table(fit$classification$vote)   # majority-vote
+
+## Factor covariates
+X_mixed <- data.frame(x1 = rnorm(n), x2 = factor(sample(c("A","B"), n, TRUE)))
+fit2 <- jocf(Y, X_mixed, num.trees = 50)
+head(fit2$predictions)
 
 }

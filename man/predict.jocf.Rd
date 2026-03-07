@@ -9,8 +9,10 @@
 \arguments{
 \item{object}{A fitted object of class \code{"jocf"}.}
 
-\item{newdata}{Numeric matrix or data.frame with the same number of
-columns as the training \code{X}.}
+\item{newdata}{Matrix or data.frame with the same number of columns and
+column types as the training \code{X}.  Factor and logical columns are
+re-encoded using the level ordering stored at training time.  Unseen
+factor levels produce a warning and are mapped to the median code.}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads.
 \code{NULL} (default) uses all available cores.}

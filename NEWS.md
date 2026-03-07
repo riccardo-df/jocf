@@ -18,3 +18,8 @@
   marginal effects.
 * Performance optimisations: Armadillo-free hot paths, global pre-sort, BFS
   tree growing, in-place partition, ranked split search.
+* **Factor / logical covariate support**: `jocf()` and `predict.jocf()` now
+  accept factor (ordered and unordered), logical, and numeric columns.
+  Unordered factor levels are sorted by `mean(Y)` and encoded as integer codes;
+  ordered factors use their existing level order; logicals map to 1/2.
+  `marginal_effects()` auto-excludes non-numeric covariates.

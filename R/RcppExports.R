@@ -10,6 +10,7 @@
 #' @param num_trees Number of trees.
 #' @param min_node_size Minimum observations per terminal node.
 #' @param max_depth Maximum tree depth (-1 = unlimited).
+#' @param n_sub Subsample size (drawn without replacement).
 #' @param mtry Number of candidate features at each split.
 #' @param M Number of outcome classes.
 #' @param lambda Numeric weight vector of length M.
@@ -19,8 +20,8 @@
 #'   `votes` (n x M integer matrix of per-tree majority votes).
 #' @keywords internal
 #' @export
-grow_forest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, mtry, M, lambda, num_threads = 0L) {
-    .Call(`_jocf_grow_forest_cpp`, Y, X, num_trees, min_node_size, max_depth, mtry, M, lambda, num_threads)
+grow_forest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads = 0L) {
+    .Call(`_jocf_grow_forest_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads)
 }
 
 #' Predict class probabilities from a fitted jocf forest

@@ -136,6 +136,7 @@ static std::vector<double> to_rowmaj(const arma::mat& x) {
 //' @param num_trees Number of trees.
 //' @param min_node_size Minimum observations per terminal node.
 //' @param max_depth Maximum tree depth (-1 = unlimited).
+//' @param n_sub Subsample size (drawn without replacement).
 //' @param mtry Number of candidate features at each split.
 //' @param M Number of outcome classes.
 //' @param lambda Numeric weight vector of length M.
@@ -152,6 +153,7 @@ Rcpp::List grow_forest_cpp(
   int                 num_trees,
   int                 min_node_size,
   int                 max_depth,
+  int                 n_sub,
   int                 mtry,
   int                 M,
   Rcpp::NumericVector lambda,
@@ -222,7 +224,7 @@ Rcpp::List grow_forest_cpp(
 
   std::vector<std::vector<int>> boot_indices(num_trees);
   for (int b = 0; b < num_trees; ++b) {
-    Rcpp::IntegerVector boot_r = Rcpp::sample(n, n, /*replace=*/true) - 1;
+    Rcpp::IntegerVector boot_r = Rcpp::sample(n, n_sub, /*replace=*/false) - 1;
     boot_indices[b].assign(boot_r.begin(), boot_r.end());
   }
 
@@ -248,7 +250,7 @@ Rcpp::List grow_forest_cpp(
       std::mt19937 rng(tree_seeds[b]);
       native_forest[b] = grow_single_tree(
         y_vec.data(), sort_data,
-        boot_indices[b].data(), n,
+        boot_indices[b].data(), n_sub,
         M, lam_raw, min_node_size, mtry, rng, max_depth
       );
       const TreeData& td   = native_forest[b];
@@ -283,7 +285,7 @@ Rcpp::List grow_forest_cpp(
     std::mt19937 rng(tree_seeds[b]);
     native_forest[b] = grow_single_tree(
       y_vec.data(), sort_data,
-      boot_indices[b].data(), n,
+      boot_indices[b].data(), n_sub,
       M, lam_raw, min_node_size, mtry, rng, max_depth
     );
     const TreeData& td   = native_forest[b];

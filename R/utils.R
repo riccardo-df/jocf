@@ -1,4 +1,4 @@
-#' @importFrom stats predict sd median
+#' @importFrom stats predict sd median plogis rnorm rbinom rlogis quantile
 NULL
 
 #' Resolve num.threads to an integer for C++ (0 = all available cores)
@@ -18,6 +18,7 @@ resolve_num_threads <- function(num.threads) {
 #' @param num.trees Positive integer number of trees.
 #' @param min.node.size Positive integer minimum node size.
 #' @param max.depth Positive integer or NULL (unlimited).
+#' @param sample.fraction Numeric in (0, 1]; subsample fraction.
 #' @param mtry Positive integer; feature subsample size.
 #' @param splitting.rule Character, one of `"simple"` or `"weighted"`.
 #' @param honesty Logical; must be `FALSE` (not yet implemented).
@@ -25,8 +26,9 @@ resolve_num_threads <- function(num.threads) {
 #' @return Invisibly returns `NULL`. Stops with an informative message on
 #'   invalid input.
 #' @keywords internal
-validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth, mtry,
-                                  splitting.rule, honesty) {
+validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth,
+                                  sample.fraction, mtry, splitting.rule,
+                                  honesty) {
   if (!is.integer(Y) && !all(Y == floor(Y)))
     stop("`Y` must be an integer vector.", call. = FALSE)
   Y <- as.integer(Y)
@@ -39,13 +41,32 @@ validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth, mtry
 
   if (!is.matrix(X) && !is.data.frame(X))
     stop("`X` must be a matrix or data.frame.", call. = FALSE)
-  X <- as.matrix(X)
-  if (!is.numeric(X))
-    stop("`X` must be numeric.", call. = FALSE)
+  if (is.matrix(X) && !is.numeric(X))
+    stop("`X` must be numeric (or a data.frame with factor/logical columns).",
+         call. = FALSE)
+  if (is.data.frame(X)) {
+    col_classes <- vapply(X, function(col) {
+      if (is.numeric(col)) return("numeric")
+      if (is.logical(col)) return("logical")
+      if (is.factor(col))  return("factor")
+      if (is.character(col)) return("character")
+      class(col)[1]
+    }, character(1))
+    bad <- col_classes == "character"
+    if (any(bad))
+      stop(sprintf("Column(s) %s are character. Convert to factor first.",
+                   paste(which(bad), collapse = ", ")), call. = FALSE)
+    unsupported <- !col_classes %in% c("numeric", "logical", "factor")
+    if (any(unsupported))
+      stop(sprintf("Column(s) %s have unsupported type(s).",
+                   paste(which(unsupported), collapse = ", ")), call. = FALSE)
+  }
   if (nrow(X) != length(Y))
     stop("`X` and `Y` must have the same number of rows.", call. = FALSE)
-  if (anyNA(X) || anyNA(Y))
-    stop("Missing values are not allowed in `X` or `Y`.", call. = FALSE)
+  if (anyNA(Y))
+    stop("Missing values are not allowed in `Y`.", call. = FALSE)
+  if (anyNA(if (is.data.frame(X)) do.call(cbind, lapply(X, as.numeric)) else X))
+    stop("Missing values are not allowed in `X`.", call. = FALSE)
 
   if (!is.numeric(num.trees) || length(num.trees) != 1L || num.trees < 1L)
     stop("`num.trees` must be a positive integer.", call. = FALSE)
@@ -57,6 +78,9 @@ validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth, mtry
         max.depth < 1L || max.depth != floor(max.depth))
       stop("`max.depth` must be a positive integer or NULL.", call. = FALSE)
   }
+  if (!is.numeric(sample.fraction) || length(sample.fraction) != 1L ||
+      sample.fraction <= 0 || sample.fraction > 1)
+    stop("`sample.fraction` must be a number in (0, 1].", call. = FALSE)
   if (!is.null(mtry)) {
     if (!is.numeric(mtry) || length(mtry) != 1L || mtry < 1L ||
         mtry > ncol(X))

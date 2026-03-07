@@ -184,3 +184,41 @@ test_that("jocf: max.depth validation rejects invalid values", {
   expect_error(jocf(d$Y, d$X, num.trees = 10, max.depth = "abc"),
                "positive integer")
 })
+
+# ---------------------------------------------------------------------------
+# sample.fraction
+# ---------------------------------------------------------------------------
+
+test_that("jocf: sample.fraction = 0.5 produces valid predictions", {
+  d   <- make_data(n = 200, M = 3, k = 4, seed = 40)
+  fit <- jocf(d$Y, d$X, num.trees = 50, sample.fraction = 0.5)
+  expect_equal(dim(fit$predictions), c(d$n, d$M))
+  expect_equal(rowSums(fit$predictions), rep(1, d$n), tolerance = 1e-10)
+  expect_true(all(fit$predictions >= 0))
+})
+
+test_that("jocf: sample.fraction = 1.0 works (full sample, no replacement)", {
+  d   <- make_data(n = 100, M = 3, k = 4, seed = 41)
+  fit <- jocf(d$Y, d$X, num.trees = 30, sample.fraction = 1.0)
+  expect_equal(dim(fit$predictions), c(d$n, d$M))
+  expect_equal(rowSums(fit$predictions), rep(1, d$n), tolerance = 1e-10)
+  expect_true(all(fit$predictions >= 0))
+})
+
+test_that("jocf: sample.fraction is stored in returned object", {
+  d   <- make_data(n = 60, M = 2, k = 3, seed = 42)
+  fit <- jocf(d$Y, d$X, num.trees = 10, sample.fraction = 0.7)
+  expect_equal(fit$sample.fraction, 0.7)
+})
+
+test_that("jocf: sample.fraction validation rejects invalid values", {
+  d <- make_data(n = 60, M = 2, k = 3, seed = 43)
+  expect_error(jocf(d$Y, d$X, num.trees = 10, sample.fraction = 0),
+               "\\(0, 1\\]")
+  expect_error(jocf(d$Y, d$X, num.trees = 10, sample.fraction = -0.5),
+               "\\(0, 1\\]")
+  expect_error(jocf(d$Y, d$X, num.trees = 10, sample.fraction = 1.5),
+               "\\(0, 1\\]")
+  expect_error(jocf(d$Y, d$X, num.trees = 10, sample.fraction = "half"),
+               "\\(0, 1\\]")
+})

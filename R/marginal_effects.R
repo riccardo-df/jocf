@@ -42,6 +42,11 @@ marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 #' The AME for covariate \eqn{j} and class \eqn{m} is the average of these
 #' individual effects over all evaluation points.
 #'
+#' Factor and logical covariates are automatically excluded because finite
+#' differences are not meaningful for categorical variables.  A `message()` is
+#' printed when columns are excluded; explicitly requesting a factor column via
+#' `target_covariates` produces a `warning()`.
+#'
 #' @param object A fitted object of class `"jocf"`.
 #' @param data Numeric matrix or data.frame with `object$k` columns.  Typically
 #'   the training data, but any evaluation data with the same column layout is
@@ -104,9 +109,9 @@ marginal_effects.jocf <- function(object,
   if (!inherits(object, "jocf"))
     stop('`object` must be of class "jocf".', call. = FALSE)
 
-  data <- as.matrix(data)
-  if (!is.numeric(data))
-    stop("`data` must be numeric.", call. = FALSE)
+  # Encode factors using stored training-time metadata
+  encoded <- encode_factors(data, factor_info = object$factor_info)
+  data <- encoded$X_encoded
   if (ncol(data) != object$k)
     stop(sprintf("`data` must have %d column(s) (same as training X).",
                  object$k), call. = FALSE)
@@ -119,13 +124,45 @@ marginal_effects.jocf <- function(object,
   k <- ncol(data)
   M <- object$M
 
+  # Identify factor columns (finite-difference is not meaningful for these)
+  factor_cols <- integer(0)
+  if (!is.null(object$factor_info)) {
+    factor_cols <- which(vapply(object$factor_info, Negate(is.null), logical(1)))
+  }
+
   # Resolve target_covariates to a sorted, unique, 1-based integer vector
   if (is.null(target_covariates)) {
     target_1based <- seq_len(k)
+    # Auto-exclude factor columns
+    if (length(factor_cols) > 0) {
+      target_1based <- setdiff(target_1based, factor_cols)
+      col_nms <- colnames(data)
+      if (is.null(col_nms)) col_nms <- paste0("X", seq_len(k))
+      message(sprintf(
+        "Factor/logical covariate(s) %s excluded from marginal effects.",
+        paste0("\"", col_nms[factor_cols], "\"", collapse = ", ")))
+    }
+    if (length(target_1based) == 0L)
+      stop("All covariates are factors; marginal effects require at least one numeric covariate.",
+           call. = FALSE)
   } else {
     target_1based <- sort(unique(as.integer(target_covariates)))
     if (any(target_1based < 1L) || any(target_1based > k))
       stop("`target_covariates` values must be in 1..ncol(data).", call. = FALSE)
+    # Warn and drop user-requested factor columns
+    requested_factors <- intersect(target_1based, factor_cols)
+    if (length(requested_factors) > 0) {
+      col_nms <- colnames(data)
+      if (is.null(col_nms)) col_nms <- paste0("X", seq_len(k))
+      warning(sprintf(
+        "Factor/logical covariate(s) %s excluded from marginal effects.",
+        paste0("\"", col_nms[requested_factors], "\"", collapse = ", ")),
+        call. = FALSE)
+      target_1based <- setdiff(target_1based, requested_factors)
+    }
+    if (length(target_1based) == 0L)
+      stop("All requested `target_covariates` are factors; marginal effects require at least one numeric covariate.",
+           call. = FALSE)
   }
   target_0based <- target_1based - 1L
   k_target      <- length(target_1based)
