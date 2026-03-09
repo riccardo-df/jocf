@@ -40,6 +40,12 @@
 #'   to evaluate with mini-forests. Default `100`.
 #' @param tune.num.draws Positive integer. Number of new random candidates
 #'   evaluated via the Kriging surrogate. Default `1000`.
+#' @param alpha Numeric in `[0, 0.5)`. Alpha-regularity parameter: every split
+#'   must leave at least a fraction `alpha` of the parent node's observations
+#'   on each side. This ensures balanced splits and is required for the
+#'   asymptotic normality results of Wager & Athey (2018). The effective
+#'   minimum child size at each split is `max(min.node.size, ceiling(alpha *
+#'   n_node))`. Default `0.05` (following GRF). Set to `0` to disable.
 #' @param honesty Logical. If `TRUE`, the forest uses sample splitting: trees
 #'   are grown on a training subsample and leaf predictions are computed from a
 #'   held-out honesty subsample. This enables valid variance estimation via
@@ -138,6 +144,7 @@ jocf <- function(Y,
                  tune.num.trees   = 50L,
                  tune.num.reps    = 100L,
                  tune.num.draws   = 1000L,
+                 alpha            = 0.05,
                  honesty          = FALSE,
                  honesty.fraction = 0.5,
                  num.threads      = NULL,
@@ -146,8 +153,8 @@ jocf <- function(Y,
 
   Y <- as.integer(Y)
   validate_jocf_inputs(Y, X, num.trees, min.node.size, max.depth,
-                       sample.fraction, mtry, splitting.rule, honesty,
-                       honesty.fraction)
+                       sample.fraction, mtry, splitting.rule, alpha,
+                       honesty, honesty.fraction)
 
   # Encode factor / ordered / logical columns to numeric codes
   encoded <- encode_factors(X, Y = Y)
@@ -189,6 +196,7 @@ jocf <- function(Y,
       tune.num.draws = as.integer(tune.num.draws),
       max_depth      = max_depth,
       lambda         = lambda,
+      alpha          = alpha,
       num_threads    = resolve_num_threads(num.threads)
     )
     # Override parameters with tuned values
@@ -214,6 +222,7 @@ jocf <- function(Y,
       X             = X_mat,
       num_trees     = as.integer(num.trees),
       min_node_size = as.integer(min.node.size),
+      alpha         = as.double(alpha),
       max_depth     = max_depth,
       n_sub_tr      = n_sub_tr,
       mtry          = as.integer(mtry),
@@ -237,6 +246,7 @@ jocf <- function(Y,
       X             = X_mat,
       num_trees     = as.integer(num.trees),
       min_node_size = as.integer(min.node.size),
+      alpha         = as.double(alpha),
       max_depth     = max_depth,
       n_sub         = n_sub,
       mtry          = as.integer(mtry),

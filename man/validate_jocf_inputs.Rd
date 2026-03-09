@@ -13,6 +13,7 @@ validate_jocf_inputs(
   sample.fraction,
   mtry,
   splitting.rule,
+  alpha = 0.05,
   honesty,
   honesty.fraction = 0.5
 )
@@ -33,6 +34,8 @@ validate_jocf_inputs(
 \item{mtry}{Positive integer; feature subsample size.}
 
 \item{splitting.rule}{Character, one of \code{"simple"} or \code{"weighted"}.}
+
+\item{alpha}{Numeric in [0, 0.5); alpha-regularity parameter.}
 
 \item{honesty}{Logical; \code{TRUE} enables honest splitting.}
 

@@ -15,6 +15,7 @@ tune_jocf(
   tune.num.draws,
   max_depth,
   lambda,
+  alpha,
   num_threads
 )
 }

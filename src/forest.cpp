@@ -192,6 +192,7 @@ Rcpp::List grow_forest_cpp(
   Rcpp::NumericMatrix X,
   int                 num_trees,
   int                 min_node_size,
+  double              alpha,
   int                 max_depth,
   int                 n_sub,
   int                 mtry,
@@ -257,7 +258,7 @@ Rcpp::List grow_forest_cpp(
       native_forest[b] = grow_single_tree(
         y_vec.data(), sort_data,
         boot_indices[b].data(), n_sub,
-        M, lam_raw, min_node_size, mtry, rng, max_depth
+        M, lam_raw, min_node_size, alpha, mtry, rng, max_depth
       );
       const TreeData& td   = native_forest[b];
       const double*   xr   = x_rowmaj.data();
@@ -292,7 +293,7 @@ Rcpp::List grow_forest_cpp(
     native_forest[b] = grow_single_tree(
       y_vec.data(), sort_data,
       boot_indices[b].data(), n_sub,
-      M, lam_raw, min_node_size, mtry, rng, max_depth
+      M, lam_raw, min_node_size, alpha, mtry, rng, max_depth
     );
     const TreeData& td   = native_forest[b];
     const double*   xr   = x_rowmaj.data();
@@ -364,6 +365,7 @@ Rcpp::List grow_forest_oob_cpp(
   Rcpp::NumericMatrix X,
   int                 num_trees,
   int                 min_node_size,
+  double              alpha,
   int                 max_depth,
   int                 n_sub,
   int                 mtry,
@@ -425,7 +427,7 @@ Rcpp::List grow_forest_oob_cpp(
       TreeData td = grow_single_tree(
         y_vec.data(), sort_data,
         boot_indices[b].data(), n_sub,
-        M, lam_raw, min_node_size, mtry, rng, max_depth
+        M, lam_raw, min_node_size, alpha, mtry, rng, max_depth
       );
       const double*      xr  = x_rowmaj.data();
       const std::vector<bool>& ib = in_bag_flags[b];
@@ -461,7 +463,7 @@ Rcpp::List grow_forest_oob_cpp(
     TreeData td = grow_single_tree(
       y_vec.data(), sort_data,
       boot_indices[b].data(), n_sub,
-      M, lam_raw, min_node_size, mtry, rng, max_depth
+      M, lam_raw, min_node_size, alpha, mtry, rng, max_depth
     );
     const double*      xr  = x_rowmaj.data();
     const std::vector<bool>& ib = in_bag_flags[b];
@@ -880,6 +882,7 @@ Rcpp::List grow_forest_honest_cpp(
   Rcpp::NumericMatrix X,
   int                 num_trees,
   int                 min_node_size,
+  double              alpha,
   int                 max_depth,
   int                 n_sub_tr,
   int                 mtry,
@@ -946,7 +949,7 @@ Rcpp::List grow_forest_honest_cpp(
       TreeData td = grow_single_tree(
         y_vec.data(), sort_data,
         boot_indices[b].data(), n_sub_tr,
-        M, lam_raw, min_node_size, mtry, rng, max_depth
+        M, lam_raw, min_node_size, alpha, mtry, rng, max_depth
       );
       const int n_nodes = td.n_nodes;
 
@@ -1038,7 +1041,7 @@ Rcpp::List grow_forest_honest_cpp(
       TreeData td = grow_single_tree(
         y_vec.data(), sort_data,
         boot_indices[b].data(), n_sub_tr,
-        M, lam_raw, min_node_size, mtry, rng, max_depth
+        M, lam_raw, min_node_size, alpha, mtry, rng, max_depth
       );
       const int n_nodes = td.n_nodes;
 

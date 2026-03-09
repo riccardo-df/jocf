@@ -33,6 +33,7 @@ TreeData grow_single_tree(
   int               M,
   const double*     lambda,
   int               min_node_size,
+  double            alpha,
   int               mtry,
   std::mt19937&     rng,
   int               max_depth    // -1 = unlimited
@@ -120,8 +121,12 @@ TreeData grow_single_tree(
       continue;
     }
 
+    // Alpha-regularity: effective minimum for this node
+    const int eff_min = std::max(min_node_size,
+                                 static_cast<int>(std::ceil(alpha * n_obs)));
+
     // Check if too small to split
-    if (n_obs < 2 * min_node_size) {
+    if (n_obs < 2 * eff_min) {
       // Set leaf probabilities
       for (int m = 0; m < M; ++m)
         lp[cursor * M + m] = static_cast<double>(node_counts[m]) / n_obs;
@@ -141,7 +146,7 @@ TreeData grow_single_tree(
     SplitResult sr = find_best_split_ranked(
       y, sort_data,
       sample_ids.data(), s, e,
-      M, lambda, min_node_size,
+      M, lambda, min_node_size, alpha,
       feat_sub.data(), mtry_k,
       counter, counter_pc
     );

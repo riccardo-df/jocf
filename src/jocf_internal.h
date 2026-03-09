@@ -105,6 +105,7 @@ SplitResult find_best_split_internal(
   int                M,
   const double*      lambda,
   int                min_node_size,
+  double             alpha,
   const int*         feat_sub,
   int                n_feat_sub,
   std::vector<int>&    sort_buf,
@@ -140,6 +141,7 @@ SplitResult find_best_split_ranked(
   int               M,
   const double*     lambda,
   int               min_node_size,
+  double            alpha,
   const int*        feat_sub,
   int               n_feat_sub,
   std::vector<int>& counter,
@@ -174,6 +176,7 @@ TreeData grow_single_tree(
   int               M,
   const double*     lambda,
   int               min_node_size,
+  double            alpha,
   int               mtry,
   std::mt19937&     rng,
   int               max_depth = -1

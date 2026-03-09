@@ -229,6 +229,18 @@ marginal_effects.jocf <- function(object,
     "atmedian" = matrix(apply(data_mat, 2, median),  nrow = 1L)
   )
 
+  # Snap integer-valued columns to nearest integer in the evaluation point.
+  # Tree-based models cannot interpolate between discrete values: e.g. a binary
+  # covariate with mean 0.4 is always routed to the x=0 branch, creating
+  # systematic prediction bias that worsens with n.  Rounding removes this
+ # artefact for "atmean" and "atmedian" evaluations.
+  if (eval %in% c("atmean", "atmedian")) {
+    for (j in seq_len(k)) {
+      if (all(data_mat[, j] == floor(data_mat[, j])))
+        X_eval[1L, j] <- round(X_eval[1L, j])
+    }
+  }
+
   # Delegate to C++ engine
   se_mat  <- NULL
   ci_lo   <- NULL

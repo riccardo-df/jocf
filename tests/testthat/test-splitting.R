@@ -173,9 +173,9 @@ test_that("find_best_split: impurity after split <= parent impurity", {
     parent_counts <- tabulate(y, nbins = M)
     parent_Q      <- node_impurity_cpp(as.integer(parent_counts), n, M,
                                         rep(1, M))
-    # Sum of children impurity should be <= parent (splitting cannot increase
-    # total impurity when we choose the minimising split).
-    expect_lte(res$impurity, parent_Q * 2 + 1e-10)
+    # n-weighted sum of children impurity should be <= n * parent
+    # (splitting cannot increase total impurity).
+    expect_lte(res$impurity, n * parent_Q + 1e-10)
   } else {
     skip("No split found in random data — try a different seed")
   }

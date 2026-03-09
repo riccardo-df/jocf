@@ -20,8 +20,8 @@
 #'   `votes` (n x M integer matrix of per-tree majority votes).
 #' @keywords internal
 #' @export
-grow_forest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads = 0L) {
-    .Call(`_jocf_grow_forest_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads)
+grow_forest_cpp <- function(Y, X, num_trees, min_node_size, alpha, max_depth, n_sub, mtry, M, lambda, num_threads = 0L) {
+    .Call(`_jocf_grow_forest_cpp`, Y, X, num_trees, min_node_size, alpha, max_depth, n_sub, mtry, M, lambda, num_threads)
 }
 
 #' Grow a forest and compute debiased OOB error
@@ -37,8 +37,8 @@ grow_forest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub, mt
 #'   oob_count == 0), `debiased_error` (scalar).
 #' @keywords internal
 #' @export
-grow_forest_oob_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads = 0L) {
-    .Call(`_jocf_grow_forest_oob_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub, mtry, M, lambda, num_threads)
+grow_forest_oob_cpp <- function(Y, X, num_trees, min_node_size, alpha, max_depth, n_sub, mtry, M, lambda, num_threads = 0L) {
+    .Call(`_jocf_grow_forest_oob_cpp`, Y, X, num_trees, min_node_size, alpha, max_depth, n_sub, mtry, M, lambda, num_threads)
 }
 
 #' Predict class probabilities from a fitted jocf forest
@@ -100,8 +100,8 @@ marginal_effects_cpp <- function(forest, X_eval, target_vars, is_discrete, h_vec
 #'   with hon_sorted/hon_offsets), `votes` (n x M integer), `n_hon` (int).
 #' @keywords internal
 #' @export
-grow_forest_honest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads = 0L) {
-    .Call(`_jocf_grow_forest_honest_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads)
+grow_forest_honest_cpp <- function(Y, X, num_trees, min_node_size, alpha, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads = 0L) {
+    .Call(`_jocf_grow_forest_honest_cpp`, Y, X, num_trees, min_node_size, alpha, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads)
 }
 
 #' Predict with variance estimation from an honest jocf forest
@@ -187,7 +187,7 @@ node_impurity_cpp <- function(counts, n, M, lambda) {
 #'   (numeric), `impurity` (numeric), and `found` (logical).
 #' @keywords internal
 #' @export
-find_best_split_cpp <- function(y, x, M, lambda, min_node_size) {
-    .Call(`_jocf_find_best_split_cpp`, y, x, M, lambda, min_node_size)
+find_best_split_cpp <- function(y, x, M, lambda, min_node_size, alpha = 0.0) {
+    .Call(`_jocf_find_best_split_cpp`, y, x, M, lambda, min_node_size, alpha)
 }
 

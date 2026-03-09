@@ -17,6 +17,7 @@ jocf(
   tune.num.trees = 50L,
   tune.num.reps = 100L,
   tune.num.draws = 1000L,
+  alpha = 0.05,
   honesty = FALSE,
   honesty.fraction = 0.5,
   num.threads = NULL,
@@ -70,6 +71,12 @@ to evaluate with mini-forests. Default \code{100}.}
 
 \item{tune.num.draws}{Positive integer. Number of new random candidates
 evaluated via the Kriging surrogate. Default \code{1000}.}
+
+\item{alpha}{Numeric in \verb{[0, 0.5)}. Alpha-regularity parameter: every split
+must leave at least a fraction \code{alpha} of the parent node's observations
+on each side. This ensures balanced splits and is required for the
+asymptotic normality results of Wager & Athey (2018). The effective
+minimum child size at each split is \code{max(min.node.size, ceiling(alpha * n_node))}. Default \code{0.05} (following GRF). Set to \code{0} to disable.}
 
 \item{honesty}{Logical. If \code{TRUE}, the forest uses sample splitting: trees
 are grown on a training subsample and leaf predictions are computed from a

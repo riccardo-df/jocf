@@ -111,7 +111,7 @@ test_that("grow_forest_oob_cpp: returns correct structure", {
   lambda <- rep(1.0, M)
   n_sub <- as.integer(ceiling(0.5 * n_test))
   res <- grow_forest_oob_cpp(Y_test, X_test, num_trees = 20L,
-                              min_node_size = 5L, max_depth = -1L,
+                              min_node_size = 5L, alpha = 0.05, max_depth = -1L,
                               n_sub = n_sub, mtry = 2L, M = M,
                               lambda = lambda, num_threads = 1L)
   expect_true(is.list(res))
@@ -124,7 +124,7 @@ test_that("grow_forest_oob_cpp: OOB predictions have correct dimensions", {
   lambda <- rep(1.0, M)
   n_sub <- as.integer(ceiling(0.5 * n_test))
   res <- grow_forest_oob_cpp(Y_test, X_test, num_trees = 30L,
-                              min_node_size = 5L, max_depth = -1L,
+                              min_node_size = 5L, alpha = 0.05, max_depth = -1L,
                               n_sub = n_sub, mtry = 2L, M = M,
                               lambda = lambda, num_threads = 1L)
   expect_equal(nrow(res$oob_predictions), n_test)
@@ -136,7 +136,7 @@ test_that("grow_forest_oob_cpp: valid OOB predictions are non-negative and sum t
   lambda <- rep(1.0, M)
   n_sub <- as.integer(ceiling(0.5 * n_test))
   res <- grow_forest_oob_cpp(Y_test, X_test, num_trees = 50L,
-                              min_node_size = 5L, max_depth = -1L,
+                              min_node_size = 5L, alpha = 0.05, max_depth = -1L,
                               n_sub = n_sub, mtry = 2L, M = M,
                               lambda = lambda, num_threads = 1L)
   valid_rows <- which(!is.nan(res$oob_predictions[, 1]))
@@ -153,7 +153,7 @@ test_that("grow_forest_oob_cpp: debiased error is finite", {
   lambda <- rep(1.0, M)
   n_sub <- as.integer(ceiling(0.5 * n_test))
   res <- grow_forest_oob_cpp(Y_test, X_test, num_trees = 50L,
-                              min_node_size = 5L, max_depth = -1L,
+                              min_node_size = 5L, alpha = 0.05, max_depth = -1L,
                               n_sub = n_sub, mtry = 2L, M = M,
                               lambda = lambda, num_threads = 1L)
   expect_true(is.finite(res$debiased_error))
@@ -164,7 +164,7 @@ test_that("grow_forest_oob_cpp: most observations have OOB predictions", {
   lambda <- rep(1.0, M)
   n_sub <- as.integer(ceiling(0.5 * n_test))
   res <- grow_forest_oob_cpp(Y_test, X_test, num_trees = 50L,
-                              min_node_size = 5L, max_depth = -1L,
+                              min_node_size = 5L, alpha = 0.05, max_depth = -1L,
                               n_sub = n_sub, mtry = 2L, M = M,
                               lambda = lambda, num_threads = 1L)
   valid_rows <- which(!is.nan(res$oob_predictions[, 1]))

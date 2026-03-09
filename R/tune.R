@@ -98,7 +98,7 @@ get_params_from_draw <- function(draws, param_names, n, k) {
 #' @keywords internal
 tune_jocf <- function(Y, X_mat, M, tune_params, defaults,
                       tune.num.trees, tune.num.reps, tune.num.draws,
-                      max_depth, lambda, num_threads) {
+                      max_depth, lambda, alpha, num_threads) {
 
   n <- length(Y)
   k <- ncol(X_mat)
@@ -126,6 +126,7 @@ tune_jocf <- function(Y, X_mat, M, tune_params, defaults,
         X           = X_mat,
         num_trees   = as.integer(tune.num.trees),
         min_node_size = as.integer(mns_r),
+        alpha       = as.double(alpha),
         max_depth   = max_depth,
         n_sub       = n_sub_r,
         mtry        = as.integer(mtry_r),

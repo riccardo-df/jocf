@@ -21,6 +21,7 @@ resolve_num_threads <- function(num.threads) {
 #' @param sample.fraction Numeric in (0, 1]; subsample fraction.
 #' @param mtry Positive integer; feature subsample size.
 #' @param splitting.rule Character, one of `"simple"` or `"weighted"`.
+#' @param alpha Numeric in \[0, 0.5); alpha-regularity parameter.
 #' @param honesty Logical; `TRUE` enables honest splitting.
 #' @param honesty.fraction Numeric in (0, 1); fraction allocated to honesty
 #'   sample.  Only validated when `honesty = TRUE`.
@@ -30,7 +31,8 @@ resolve_num_threads <- function(num.threads) {
 #' @keywords internal
 validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth,
                                   sample.fraction, mtry, splitting.rule,
-                                  honesty, honesty.fraction = 0.5) {
+                                  alpha = 0.05, honesty,
+                                  honesty.fraction = 0.5) {
   if (!is.integer(Y) && !all(Y == floor(Y)))
     stop("`Y` must be an integer vector.", call. = FALSE)
   Y <- as.integer(Y)
@@ -90,6 +92,8 @@ validate_jocf_inputs <- function(Y, X, num.trees, min.node.size, max.depth,
   }
   if (!splitting.rule %in% c("simple", "weighted"))
     stop('`splitting.rule` must be "simple" or "weighted".', call. = FALSE)
+  if (!is.numeric(alpha) || length(alpha) != 1L || alpha < 0 || alpha >= 0.5)
+    stop("`alpha` must be a number in [0, 0.5).", call. = FALSE)
   if (!is.logical(honesty) || length(honesty) != 1L)
     stop("`honesty` must be TRUE or FALSE.", call. = FALSE)
   if (isTRUE(honesty)) {

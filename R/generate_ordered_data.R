@@ -146,6 +146,15 @@ generate_ordered_data <- function(n,
   x_mean   <- colMeans(X_matrix)
   x_median <- apply(X_matrix, 2, median)
 
+  # Snap integer-valued columns to nearest integer (consistent with
+  # marginal_effects.jocf eval = "atmean" / "atmedian" snapping).
+  for (j in seq_len(ncol(X_matrix))) {
+    if (all(X_matrix[, j] == floor(X_matrix[, j]))) {
+      x_mean[j]   <- round(x_mean[j])
+      x_median[j] <- round(x_median[j])
+    }
+  }
+
   compute_true_me <- function(x_eval) {
     me <- matrix(0, nrow = 6, ncol = M)
     g_eval <- sum(x_eval * beta)

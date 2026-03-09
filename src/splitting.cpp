@@ -25,7 +25,7 @@
 // ---------------------------------------------------------------------------
 // find_best_split_internal  (declared in jocf_internal.h)
 //
-// Searches feat_sub for the split minimising Q(left) + Q(right).
+// Searches feat_sub for the split minimising n_L*Q(left) + n_R*Q(right).
 // y_boot is 0-indexed (values 0..M-1).
 //
 // x_boot_cm is column-major with n_boot rows:
@@ -43,11 +43,16 @@ SplitResult find_best_split_internal(
   int                  M,
   const double*        lambda,
   int                  min_node_size,
+  double               alpha,
   const int*           feat_sub,
   int                  n_feat_sub,
   std::vector<int>&    sort_buf,
   std::vector<double>& val_buf
 ) {
+  // Alpha-regularity: effective minimum is max(min_node_size, ceil(alpha * n_obs))
+  const int eff_min = std::max(min_node_size,
+                               static_cast<int>(std::ceil(alpha * n_obs)));
+
   // Total class counts for this node
   std::vector<int> total_counts(M, 0);
   for (int i = 0; i < n_obs; ++i) total_counts[y_boot[obs[i]]]++;
@@ -95,13 +100,13 @@ SplitResult find_best_split_internal(
       const double xval_next = val_buf[sort_buf[ii + 1]];
       if (xval_cur >= xval_next) continue;
 
-      // Enforce minimum node size on both children
-      if (n_left  < min_node_size) continue;
-      if (n_right < min_node_size) continue;
+      // Enforce minimum node size + alpha-regularity on both children
+      if (n_left  < eff_min) continue;
+      if (n_right < eff_min) continue;
 
       const double imp =
-          compute_impurity(left_counts.data(),  n_left,  M, lambda) +
-          compute_impurity(right_counts.data(), n_right, M, lambda);
+          static_cast<double>(n_left)  * compute_impurity(left_counts.data(),  n_left,  M, lambda) +
+          static_cast<double>(n_right) * compute_impurity(right_counts.data(), n_right, M, lambda);
 
       if (imp < best_impurity) {
         best_impurity  = imp;
@@ -138,6 +143,7 @@ SplitResult find_best_split_ranked(
   int               M,
   const double*     lambda,
   int               min_node_size,
+  double            alpha,
   const int*        feat_sub,
   int               n_feat_sub,
   std::vector<int>& counter,
@@ -145,6 +151,10 @@ SplitResult find_best_split_ranked(
 ) {
   const int n_obs = end - start;
   const int n     = sort_data.n;
+
+  // Alpha-regularity: effective minimum is max(min_node_size, ceil(alpha * n_obs))
+  const int eff_min = std::max(min_node_size,
+                               static_cast<int>(std::ceil(alpha * n_obs)));
 
   // Total class counts for this node
   std::vector<int> total_counts(M, 0);
@@ -192,13 +202,13 @@ SplitResult find_best_split_ranked(
       // Skip if no observations at this rank
       if (counter[r] == 0) continue;
 
-      // Enforce minimum node size
-      if (n_left < min_node_size) continue;
-      if (n_right < min_node_size) break;   // early termination
+      // Enforce minimum node size + alpha-regularity
+      if (n_left < eff_min) continue;
+      if (n_right < eff_min) break;   // early termination
 
       const double imp =
-          compute_impurity(left_counts.data(),  n_left,  M, lambda) +
-          compute_impurity(right_counts.data(), n_right, M, lambda);
+          static_cast<double>(n_left)  * compute_impurity(left_counts.data(),  n_left,  M, lambda) +
+          static_cast<double>(n_right) * compute_impurity(right_counts.data(), n_right, M, lambda);
 
       if (imp < best_impurity) {
         best_impurity  = imp;
@@ -292,7 +302,8 @@ Rcpp::List find_best_split_cpp(Rcpp::IntegerVector y,
                                 Rcpp::NumericMatrix x,
                                 int                 M,
                                 Rcpp::NumericVector lambda,
-                                int                 min_node_size) {
+                                int                 min_node_size,
+                                double              alpha = 0.0) {
   const int n = y.size();
   const int k = x.ncol();
 
@@ -318,7 +329,7 @@ Rcpp::List find_best_split_cpp(Rcpp::IntegerVector y,
   const SplitResult sr = find_best_split_internal(
     y0.data(), x_ptr, n,
     obs.data(), n,
-    M, lambda.begin(), min_node_size,
+    M, lambda.begin(), min_node_size, alpha,
     all_features.data(), k,
     sort_buf, val_buf
   );

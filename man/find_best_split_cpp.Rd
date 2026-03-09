@@ -4,7 +4,7 @@
 \alias{find_best_split_cpp}
 \title{Find the best split for a node}
 \usage{
-find_best_split_cpp(y, x, M, lambda, min_node_size)
+find_best_split_cpp(y, x, M, lambda, min_node_size, alpha = 0)
 }
 \arguments{
 \item{y}{Integer vector of class labels (1..M); length = node size.}

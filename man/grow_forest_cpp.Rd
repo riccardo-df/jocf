@@ -9,6 +9,7 @@ grow_forest_cpp(
   X,
   num_trees,
   min_node_size,
+  alpha,
   max_depth,
   n_sub,
   mtry,
