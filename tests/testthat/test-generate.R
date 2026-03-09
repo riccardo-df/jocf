@@ -180,20 +180,23 @@ test_that("true_me row sums are zero for M=5", {
   expect_equal(unname(rowSums(d$true_me_atmedian)), rep(0, 6), tolerance = 1e-10)
 })
 
-test_that("noise covariates (x5, x6) have exactly zero MEs", {
+test_that("x5, x6 have non-zero MEs (beta = 0.25)", {
   set.seed(37)
   d <- generate_ordered_data(300)
-  expect_equal(as.numeric(d$true_me_atmean[5, ]), rep(0, 3))
-  expect_equal(as.numeric(d$true_me_atmean[6, ]), rep(0, 3))
-  expect_equal(as.numeric(d$true_me_atmedian[5, ]), rep(0, 3))
-  expect_equal(as.numeric(d$true_me_atmedian[6, ]), rep(0, 3))
+  ## x5, x6 now have beta = 0.25, so MEs are non-zero but smaller than x1 (beta = 1).
+  expect_true(all(abs(d$true_me_atmean[5, ]) > 0))
+  expect_true(all(abs(d$true_me_atmean[6, ]) > 0))
+  expect_true(all(abs(d$true_me_atmean[5, ]) < abs(d$true_me_atmean[1, ])))
+  ## Rows still sum to zero.
+  expect_equal(sum(d$true_me_atmean[5, ]), 0, tolerance = 1e-10)
+  expect_equal(sum(d$true_me_atmean[6, ]), 0, tolerance = 1e-10)
 })
 
-test_that("noise covariates zero for M=5", {
+test_that("x5, x6 non-zero for M=5", {
   set.seed(38)
   d <- generate_ordered_data(300, n_categories = 5)
-  expect_equal(as.numeric(d$true_me_atmean[5, ]), rep(0, 5))
-  expect_equal(as.numeric(d$true_me_atmean[6, ]), rep(0, 5))
+  expect_true(all(abs(d$true_me_atmean[5, ]) > 0))
+  expect_true(all(abs(d$true_me_atmean[6, ]) > 0))
 })
 
 test_that("true_me has correct row and column names", {

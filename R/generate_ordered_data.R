@@ -10,9 +10,10 @@
 #' \enumerate{
 #'   \item **Covariates** (k = 6): \eqn{x_1, x_3 \sim N(0,1)};
 #'     \eqn{x_2, x_4 \sim \textrm{Bernoulli}(0.4)};
-#'     \eqn{x_5, x_6} are noise covariates drawn from the same distributions
-#'     with zero coefficients.
-#'   \item **Linear index**: \eqn{g(X) = x_1 + x_2 + 0.5 x_3 + 0.5 x_4}.
+#'     \eqn{x_5, x_6} are drawn from the same distributions
+#'     with smaller coefficients (0.5).
+#'   \item **Linear index**: \eqn{g(X) = 2 x_1 + 2 x_2 + x_3 + x_4
+#'     + 0.5 x_5 + 0.5 x_6}.
 #'   \item **Latent outcome**: \eqn{Y^* = g(X) + \varepsilon},
 #'     \eqn{\varepsilon \sim \textrm{Logistic}(0,1)}.
 #'   \item **Discretisation**: \eqn{Y = m} when
@@ -95,7 +96,10 @@ generate_ordered_data <- function(n,
   x2_pop  <- rbinom(n_pop, 1L, 0.4)
   x3_pop  <- rnorm(n_pop)
   x4_pop  <- rbinom(n_pop, 1L, 0.4)
-  g_pop   <- x1_pop + x2_pop + 0.5 * x3_pop + 0.5 * x4_pop
+  x5_pop  <- rnorm(n_pop)
+  x6_pop  <- rbinom(n_pop, 1L, 0.4)
+  g_pop   <- 2 * x1_pop + 2 * x2_pop + x3_pop + x4_pop +
+             0.5 * x5_pop + 0.5 * x6_pop
   eps_pop <- rlogis(n_pop)
   ystar_pop <- g_pop + eps_pop
 
@@ -110,7 +114,7 @@ generate_ordered_data <- function(n,
   x4 <- rbinom(n, 1L, 0.4)
   x5 <- rnorm(n)
   x6 <- rbinom(n, 1L, 0.4)
-  g  <- x1 + x2 + 0.5 * x3 + 0.5 * x4
+  g  <- 2 * x1 + 2 * x2 + x3 + x4 + 0.5 * x5 + 0.5 * x6
   eps <- rlogis(n)
   ystar <- g + eps
 
@@ -136,7 +140,7 @@ generate_ordered_data <- function(n,
   }
 
   ## --- True marginal effects ------------------------------------------------
-  beta <- c(1, 1, 0.5, 0.5, 0, 0)
+  beta <- c(2, 2, 1, 1, 0.5, 0.5)
   is_discrete <- c(FALSE, TRUE, FALSE, TRUE, FALSE, TRUE)  # x2, x4, x6
   cov_names <- paste0("x", 1:6)
   class_names <- paste0("Y", seq_len(M))
