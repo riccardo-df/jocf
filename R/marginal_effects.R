@@ -61,7 +61,11 @@ marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 #'   `c(x1 = "continuous", x4 = "discrete")`.  When `NULL`, all numeric columns
 #'   are used (all treated as continuous; factor columns are auto-excluded).
 #' @param bandwidth Positive scalar bandwidth for the continuous finite
-#'   difference.  Default `1`.
+#'   difference, or `NULL` (default).  When `NULL`, the bandwidth is set to
+#'   \eqn{n^{-1/6 - \varepsilon}} with \eqn{\varepsilon = 0.001} and \eqn{n}
+#'   the training sample size.  This rate is slightly faster than the
+#'   MSE-optimal \eqn{O(n^{-1/6})} and ensures asymptotic normality of the
+#'   estimator (see Section 5.4 of the technical notes).
 #' @param num.threads Positive integer or `NULL`. Number of OpenMP threads.
 #'   `NULL` (default) uses all available cores.
 #' @param ... Currently unused.
@@ -116,7 +120,7 @@ marginal_effects.jocf <- function(object,
                                    data              = NULL,
                                    eval              = c("mean", "atmean", "atmedian"),
                                    target_covariates = NULL,
-                                   bandwidth         = 1,
+                                   bandwidth         = NULL,
                                    num.threads       = NULL,
                                    ...) {
   cl   <- match.call()
@@ -142,6 +146,12 @@ marginal_effects.jocf <- function(object,
   if (anyNA(data_mat))
     stop("Missing values are not allowed in `data`.", call. = FALSE)
 
+  # Resolve bandwidth: NULL -> n^{-1/6 - epsilon} (asymptotically valid default)
+  if (is.null(bandwidth)) {
+    n_train <- nrow(object$X_train)
+    if (is.null(n_train)) n_train <- nrow(data_mat)
+    bandwidth <- n_train^(-1/6 - 0.001)
+  }
   if (!is.numeric(bandwidth) || length(bandwidth) != 1L || bandwidth <= 0)
     stop("`bandwidth` must be a single positive number.", call. = FALSE)
 

@@ -252,8 +252,9 @@ test_that("summary.jocf_me non-honest: prints effects matrix", {
 # bandwidth default changed to 1
 # ===========================================================================
 
-test_that("marginal_effects: default bandwidth is 1", {
+test_that("marginal_effects: default bandwidth is n^{-1/6 - 0.001}", {
   d  <- make_fit(seed = 25)
   me <- marginal_effects(d$fit, data = d$X)
-  expect_equal(me$bandwidth, 1)
+  n  <- nrow(d$fit$X_train)
+  expect_equal(me$bandwidth, n^(-1/6 - 0.001), tolerance = 1e-10)
 })

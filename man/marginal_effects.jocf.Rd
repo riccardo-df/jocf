@@ -9,7 +9,7 @@
   data = NULL,
   eval = c("mean", "atmean", "atmedian"),
   target_covariates = NULL,
-  bandwidth = 1,
+  bandwidth = NULL,
   num.threads = NULL,
   ...
 )
@@ -33,7 +33,11 @@ names; values must be \code{"continuous"} or \code{"discrete"}.  For example,
 are used (all treated as continuous; factor columns are auto-excluded).}
 
 \item{bandwidth}{Positive scalar bandwidth for the continuous finite
-difference.  Default \code{1}.}
+difference, or \code{NULL} (default).  When \code{NULL}, the bandwidth is set to
+\eqn{n^{-1/6 - \varepsilon}} with \eqn{\varepsilon = 0.001} and \eqn{n}
+the training sample size.  This rate is slightly faster than the
+MSE-optimal \eqn{O(n^{-1/6})} and ensures asymptotic normality of the
+estimator (see Section 5.4 of the technical notes).}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads.
 \code{NULL} (default) uses all available cores.}
