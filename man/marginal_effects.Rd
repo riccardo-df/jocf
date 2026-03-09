@@ -24,7 +24,7 @@ n <- 150
 X <- matrix(rnorm(n * 3), ncol = 3)
 Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
 fit <- jocf(Y, X, num.trees = 50)
-me <- marginal_effects(fit, X)
+me <- marginal_effects(fit)
 me
 
 }

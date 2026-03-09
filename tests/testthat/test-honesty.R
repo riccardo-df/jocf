@@ -391,3 +391,30 @@ test_that("print.jocf_me does NOT display SEs for non-honest", {
   output <- capture.output(print(me))
   expect_false(any(grepl("Standard Errors", output)))
 })
+
+# ============================================================================
+# summary.jocf_me (honest)
+# ============================================================================
+
+test_that("summary.jocf_me honest: shows per-class tables with z values", {
+  fit <- make_honest_fit(n = 200, M = 3, B = 30, seed = 200)
+  set.seed(201)
+  X <- matrix(rnorm(200 * 3), ncol = 3)
+  me <- marginal_effects(fit, X)
+  out <- capture.output(summary(me))
+  expect_true(any(grepl("--- P\\(Y=1\\) ---", out)))
+  expect_true(any(grepl("--- P\\(Y=2\\) ---", out)))
+  expect_true(any(grepl("--- P\\(Y=3\\) ---", out)))
+  expect_true(any(grepl("z value", out)))
+  expect_true(any(grepl("Std.Error", out)))
+  expect_true(any(grepl("CI 95%", out)))
+})
+
+test_that("summary.jocf_me honest: returns invisibly", {
+  fit <- make_honest_fit(n = 200, M = 3, B = 30, seed = 202)
+  set.seed(203)
+  X <- matrix(rnorm(200 * 3), ncol = 3)
+  me <- marginal_effects(fit, X)
+  out <- capture.output(res <- summary(me))
+  expect_identical(res, me)
+})

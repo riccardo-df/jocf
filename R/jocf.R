@@ -75,6 +75,8 @@
 #'   \item{`M`}{Integer; number of outcome classes.}
 #'   \item{`num.trees`}{Integer; number of trees grown.}
 #'   \item{`k`}{Integer; number of training covariates.}
+#'   \item{`X_train`}{Factor-encoded numeric training matrix (n x k); used as
+#'     the default `data` argument by [marginal_effects.jocf()].}
 #'   \item{`tuning.output`}{`NULL` when tuning is off, otherwise a named list
 #'     with components `status` (`"tuned"`, `"default"`, or `"failure"`),
 #'     `params` (selected parameter values), `error` (debiased OOB error),
@@ -265,12 +267,121 @@ jocf <- function(Y,
       honest_data     = honest_data,
       M               = M,
       num.trees       = as.integer(num.trees),
+      n               = n,
       k               = k,
       factor_info     = fi,
       col_names       = colnames(X_mat),
+      X_train         = X_mat,
       tuning.output   = tuning_output,
       call            = cl
     ),
     class = "jocf"
   )
+}
+
+
+#' Print method for jocf objects
+#'
+#' Displays a concise one-screen overview of a fitted joint ordered correlation
+#' forest, following the ranger-style convention.
+#'
+#' @param x A `"jocf"` object.
+#' @param ... Currently unused.
+#'
+#' @return Invisibly returns `x`.
+#' @export
+print.jocf <- function(x, ...) {
+  cat("Joint Ordered Correlation Forest\n\n")
+  cat("Call:", deparse(x$call), "\n\n")
+
+  n_obs <- if (!is.null(x$n)) x$n else nrow(x$predictions)
+  cat(sprintf("  %-20s%s\n", "Type:", "Joint ordered correlation forest"))
+  cat(sprintf("  %-20s%d\n", "Number of trees:", x$num.trees))
+  cat(sprintf("  %-20s%d\n", "Observations:", n_obs))
+  cat(sprintf("  %-20s%d\n", "Covariates:", x$k))
+  cat(sprintf("  %-20s%d\n", "Outcome classes:", x$M))
+  cat(sprintf("  %-20s%s\n", "Splitting rule:", x$splitting.rule))
+  cat(sprintf("  %-20s%s\n", "Sample fraction:", format(x$sample.fraction)))
+
+  if (isTRUE(x$honesty)) {
+    cat(sprintf("  %-20s%s\n", "Honesty:",
+                paste0("TRUE (fraction = ", x$honesty.fraction, ")")))
+  } else {
+    cat(sprintf("  %-20s%s\n", "Honesty:", "FALSE"))
+  }
+
+  if (!is.null(x$tuning.output)) {
+    tp <- x$tuning.output$params
+    parts <- vapply(names(tp), function(nm) {
+      paste0(nm, " = ", format(tp[[nm]]))
+    }, character(1))
+    cat(sprintf("  %-20s%s\n", "Tuning:", paste(parts, collapse = ", ")))
+  }
+
+  invisible(x)
+}
+
+
+#' Summary method for jocf objects
+#'
+#' Extends [print.jocf()] with in-sample prediction diagnostics: per-class
+#' probability summaries and classification frequency tables.
+#'
+#' @param object A `"jocf"` object.
+#' @param ... Currently unused.
+#'
+#' @return Invisibly returns an object of class `"summary.jocf"`.
+#' @export
+summary.jocf <- function(object, ...) {
+  M    <- object$M
+  preds <- object$predictions
+
+  # Per-class min, mean, max
+  prob_summary <- matrix(NA_real_, nrow = 3L, ncol = M)
+  for (m in seq_len(M)) {
+    prob_summary[1L, m] <- min(preds[, m])
+    prob_summary[2L, m] <- mean(preds[, m])
+    prob_summary[3L, m] <- max(preds[, m])
+  }
+  rownames(prob_summary) <- c("Min.", "Mean", "Max.")
+  colnames(prob_summary) <- paste0("P(Y=", seq_len(M), ")")
+
+  # Classification tables
+  class_prob_tab <- tabulate(object$classification$prob, nbins = M)
+  names(class_prob_tab) <- seq_len(M)
+  class_vote_tab <- tabulate(object$classification$vote, nbins = M)
+  names(class_vote_tab) <- seq_len(M)
+
+  out <- list(
+    object         = object,
+    prob_summary   = prob_summary,
+    class_prob_tab = class_prob_tab,
+    class_vote_tab = class_vote_tab
+  )
+  class(out) <- "summary.jocf"
+  out
+}
+
+
+#' Print method for summary.jocf objects
+#'
+#' @param x A `"summary.jocf"` object.
+#' @param digits Number of significant digits. Default `4`.
+#' @param ... Currently unused.
+#'
+#' @return Invisibly returns `x`.
+#' @export
+print.summary.jocf <- function(x, digits = 4L, ...) {
+  print.jocf(x$object)
+
+  cat("\nIn-sample predicted probabilities:\n")
+  print(round(x$prob_summary, digits))
+
+  cat("\nIn-sample classification (probability-based):\n")
+  print(x$class_prob_tab)
+
+  cat("\nIn-sample classification (majority-vote):\n")
+  print(x$class_vote_tab)
+
+  invisible(x)
 }

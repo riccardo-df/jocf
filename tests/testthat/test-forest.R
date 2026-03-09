@@ -222,3 +222,98 @@ test_that("jocf: sample.fraction validation rejects invalid values", {
   expect_error(jocf(d$Y, d$X, num.trees = 10, sample.fraction = "half"),
                "\\(0, 1\\]")
 })
+
+# ---------------------------------------------------------------------------
+# print.jocf
+# ---------------------------------------------------------------------------
+
+test_that("print.jocf: runs without error and returns invisibly", {
+  d   <- make_data(n = 80, M = 3, k = 4, seed = 50)
+  fit <- jocf(d$Y, d$X, num.trees = 20)
+  out <- capture.output(res <- print(fit))
+  expect_identical(res, fit)
+  expect_true(any(grepl("Joint Ordered Correlation Forest", out)))
+})
+
+test_that("print.jocf: displays key metadata", {
+  d   <- make_data(n = 100, M = 4, k = 5, seed = 51)
+  fit <- jocf(d$Y, d$X, num.trees = 30, splitting.rule = "weighted")
+  out <- capture.output(print(fit))
+  expect_true(any(grepl("Number of trees:.*30", out)))
+  expect_true(any(grepl("Observations:.*100", out)))
+  expect_true(any(grepl("Covariates:.*5", out)))
+  expect_true(any(grepl("Outcome classes:.*4", out)))
+  expect_true(any(grepl("Splitting rule:.*weighted", out)))
+  expect_true(any(grepl("Honesty:.*FALSE", out)))
+})
+
+test_that("print.jocf: shows sample fraction", {
+  d   <- make_data(n = 80, M = 3, k = 3, seed = 52)
+  fit <- jocf(d$Y, d$X, num.trees = 10, sample.fraction = 0.7)
+  out <- capture.output(print(fit))
+  expect_true(any(grepl("Sample fraction:.*0.7", out)))
+})
+
+test_that("print.jocf: shows honesty when TRUE", {
+  d   <- make_data(n = 200, M = 3, k = 3, seed = 53)
+  fit <- jocf(d$Y, d$X, num.trees = 20, honesty = TRUE, honesty.fraction = 0.4)
+  out <- capture.output(print(fit))
+  expect_true(any(grepl("Honesty:.*TRUE.*fraction.*0.4", out)))
+})
+
+test_that("print.jocf: omits Tuning line when no tuning", {
+  d   <- make_data(n = 80, M = 3, k = 3, seed = 54)
+  fit <- jocf(d$Y, d$X, num.trees = 10)
+  out <- capture.output(print(fit))
+  expect_false(any(grepl("Tuning:", out)))
+})
+
+# ---------------------------------------------------------------------------
+# summary.jocf
+# ---------------------------------------------------------------------------
+
+test_that("summary.jocf: returns a summary.jocf object", {
+  d   <- make_data(n = 100, M = 3, k = 4, seed = 55)
+  fit <- jocf(d$Y, d$X, num.trees = 20)
+  s   <- summary(fit)
+  expect_s3_class(s, "summary.jocf")
+})
+
+test_that("summary.jocf: prob_summary has correct dimensions", {
+  d   <- make_data(n = 100, M = 4, k = 3, seed = 56)
+  fit <- jocf(d$Y, d$X, num.trees = 20)
+  s   <- summary(fit)
+  expect_equal(dim(s$prob_summary), c(3L, 4L))
+  expect_equal(rownames(s$prob_summary), c("Min.", "Mean", "Max."))
+})
+
+test_that("summary.jocf: classification tables have correct structure", {
+  d   <- make_data(n = 100, M = 3, k = 4, seed = 57)
+  fit <- jocf(d$Y, d$X, num.trees = 20)
+  s   <- summary(fit)
+  expect_equal(length(s$class_prob_tab), 3L)
+  expect_equal(length(s$class_vote_tab), 3L)
+  expect_equal(sum(s$class_prob_tab), 100L)
+  expect_equal(sum(s$class_vote_tab), 100L)
+})
+
+test_that("print.summary.jocf: displays prediction diagnostics", {
+  d   <- make_data(n = 80, M = 3, k = 3, seed = 58)
+  fit <- jocf(d$Y, d$X, num.trees = 20)
+  s   <- summary(fit)
+  out <- capture.output(print(s))
+  expect_true(any(grepl("In-sample predicted probabilities", out)))
+  expect_true(any(grepl("probability-based", out)))
+  expect_true(any(grepl("majority-vote", out)))
+  expect_true(any(grepl("Joint Ordered Correlation Forest", out)))
+})
+
+test_that("summary.jocf: Min <= Mean <= Max for each class", {
+  d   <- make_data(n = 150, M = 3, k = 4, seed = 59)
+  fit <- jocf(d$Y, d$X, num.trees = 50)
+  s   <- summary(fit)
+  for (m in seq_len(3L)) {
+    expect_lte(s$prob_summary["Min.", m], s$prob_summary["Mean", m])
+    expect_lte(s$prob_summary["Mean", m], s$prob_summary["Max.", m])
+  }
+})

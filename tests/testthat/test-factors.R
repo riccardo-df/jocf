@@ -253,7 +253,9 @@ test_that("marginal_effects() warns when user requests factor column", {
   fit <- jocf(Y, X, num.trees = 10)
 
   expect_warning(
-    me <- marginal_effects(fit, X, target_covariates = c(1, 2)),
+    me <- marginal_effects(fit, X,
+                           target_covariates = c(x1 = "continuous",
+                                                 x2 = "continuous")),
     "excluded from marginal effects"
   )
   expect_equal(nrow(me$effects), 1)

@@ -11,6 +11,17 @@ make_fit <- function(n = 120, M = 3, k = 4, num.trees = 80, seed = 1L) {
 }
 
 # ===========================================================================
+# data = NULL default (uses X_train)
+# ===========================================================================
+
+test_that("marginal_effects data=NULL: uses stored training data", {
+  d   <- make_fit(seed = 50)
+  me1 <- marginal_effects(d$fit)
+  me2 <- marginal_effects(d$fit, data = d$X)
+  expect_equal(me1$effects, me2$effects, tolerance = 1e-12)
+})
+
+# ===========================================================================
 # eval = "mean" (default)
 # ===========================================================================
 
@@ -89,56 +100,87 @@ test_that("marginal_effects eval=atmedian: AME rows sum to 0 across classes", {
 })
 
 # ===========================================================================
-# target_covariates subset
+# target_covariates subset (named character vector)
 # ===========================================================================
 
-test_that("marginal_effects target_covariates=c(1,3): AME has 2 rows", {
+test_that("marginal_effects target_covariates subset: AME has 2 rows", {
   d  <- make_fit(n = 120, M = 3, k = 4, seed = 12)
-  me <- marginal_effects(d$fit, data = d$X, target_covariates = c(1L, 3L))
+  me <- marginal_effects(d$fit, data = d$X,
+                         target_covariates = c(X1 = "continuous",
+                                               X3 = "continuous"))
   expect_equal(dim(me$effects), c(2L, d$M))
 })
 
 test_that("marginal_effects target_covariates subset: AME rows sum to 0", {
   d  <- make_fit(n = 120, M = 3, k = 4, seed = 13)
-  me <- marginal_effects(d$fit, data = d$X, target_covariates = c(2L, 4L))
+  me <- marginal_effects(d$fit, data = d$X,
+                         target_covariates = c(X2 = "continuous",
+                                               X4 = "continuous"))
   expect_equal(unname(rowSums(me$effects)), c(0, 0), tolerance = 1e-10)
 })
 
-test_that("marginal_effects target_covariates: target_covariates field stored", {
+test_that("marginal_effects target_covariates: field stored correctly", {
   d  <- make_fit(seed = 14)
-  me <- marginal_effects(d$fit, data = d$X, target_covariates = c(1L, 3L))
-  expect_equal(me$target_covariates, c(1L, 3L))
+  tc <- c(X1 = "continuous", X3 = "continuous")
+  me <- marginal_effects(d$fit, data = d$X, target_covariates = tc)
+  expect_equal(me$target_covariates, tc)
 })
 
-test_that("marginal_effects target_covariates: error on out-of-range index", {
+test_that("marginal_effects target_covariates: error on unknown column name", {
   d <- make_fit(n = 80, M = 3, k = 4, seed = 15)
   expect_error(
-    marginal_effects(d$fit, data = d$X, target_covariates = 5L),
-    regexp = "1..ncol"
+    marginal_effects(d$fit, data = d$X,
+                     target_covariates = c(X5 = "continuous")),
+    regexp = "not found"
+  )
+})
+
+test_that("marginal_effects target_covariates: error on non-named vector", {
+  d <- make_fit(n = 80, M = 3, k = 4, seed = 15)
+  expect_error(
+    marginal_effects(d$fit, data = d$X,
+                     target_covariates = c("continuous", "discrete")),
+    regexp = "named character vector"
+  )
+})
+
+test_that("marginal_effects target_covariates: error on invalid values", {
+  d <- make_fit(n = 80, M = 3, k = 4, seed = 15)
+  expect_error(
+    marginal_effects(d$fit, data = d$X,
+                     target_covariates = c(X1 = "foo")),
+    regexp = "continuous.*discrete"
   )
 })
 
 # ===========================================================================
-# Discrete covariates
+# Discrete covariates (via target_covariates)
 # ===========================================================================
 
-test_that("marginal_effects discrete_vars: runs without error", {
+test_that("marginal_effects discrete target: runs without error", {
   d      <- make_fit(n = 100, M = 3, k = 4, seed = 16)
   X2     <- d$X
   X2[,2] <- sample(0L:3L, d$n, replace = TRUE)
   expect_no_error(
-    marginal_effects(d$fit, data = X2, discrete_vars = 2L)
+    marginal_effects(d$fit, data = X2,
+                     target_covariates = c(X1 = "continuous",
+                                           X2 = "discrete",
+                                           X3 = "continuous",
+                                           X4 = "continuous"))
   )
 })
 
-test_that("marginal_effects discrete_vars: AME rows sum to 0", {
+test_that("marginal_effects discrete target: AME rows sum to 0", {
   set.seed(17)
   n <- 120; M <- 3; k <- 3
   Y <- sample(seq_len(M), n, replace = TRUE)
   X <- matrix(rnorm(n * k), n, k)
   X[, 3] <- sample(0L:2L, n, replace = TRUE)
   fit <- jocf(Y, X, num.trees = 60)
-  me  <- marginal_effects(fit, data = X, discrete_vars = 3L)
+  me  <- marginal_effects(fit, data = X,
+                          target_covariates = c(X1 = "continuous",
+                                                X2 = "continuous",
+                                                X3 = "discrete"))
   expect_equal(unname(rowSums(me$effects)), rep(0, k), tolerance = 1e-10)
   expect_true(all(is.finite(me$effects)))
 })
@@ -182,4 +224,36 @@ test_that("print.jocf_me: eval label appears in output", {
   me  <- marginal_effects(d$fit, data = d$X, eval = "atmean")
   out <- capture.output(print(me))
   expect_true(any(grepl("Marginal Effects at Mean", out)))
+})
+
+# ===========================================================================
+# summary.jocf_me (non-honest)
+# ===========================================================================
+
+test_that("summary.jocf_me non-honest: runs and returns invisibly", {
+  d  <- make_fit(seed = 23)
+  me <- marginal_effects(d$fit, data = d$X)
+  out <- capture.output(res <- summary(me))
+  expect_identical(res, me)
+  expect_true(any(grepl("Average Marginal Effects", out)))
+})
+
+test_that("summary.jocf_me non-honest: prints effects matrix", {
+  d  <- make_fit(n = 80, M = 3, k = 3, seed = 24)
+  me <- marginal_effects(d$fit, data = d$X)
+  out <- capture.output(summary(me))
+  # Should contain class headers from the effects matrix
+  expect_true(any(grepl("P\\(Y=1\\)", out)))
+  # Should NOT contain z value column
+  expect_false(any(grepl("z value", out)))
+})
+
+# ===========================================================================
+# bandwidth default changed to 1
+# ===========================================================================
+
+test_that("marginal_effects: default bandwidth is 1", {
+  d  <- make_fit(seed = 25)
+  me <- marginal_effects(d$fit, data = d$X)
+  expect_equal(me$bandwidth, 1)
 })

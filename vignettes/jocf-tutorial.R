@@ -47,21 +47,23 @@ preds$classification$vote
 
 
 ## ----me-----------------------------------------------------------------------
-## AME averaged over all training observations
-me <- marginal_effects(fit, X)
+## Marginal effects averaged over all training observations
+me <- marginal_effects(fit)
 me
 
 
 ## ----me_options---------------------------------------------------------------
-## AME evaluated at the covariate means, for covariates 1 and 3 only
-me_atmean <- marginal_effects(fit, X, eval = "atmean",
-                              target_covariates = c(1, 3))
+## Marginal effects evaluated at the covariate means, for x1 and x3 only
+me_atmean <- marginal_effects(fit, eval = "atmean",
+                              target_covariates = c(x1 = "continuous",
+                                                    x3 = "continuous"))
 me_atmean
 
 
 ## ----me_discrete--------------------------------------------------------------
-## Treat covariate 4 as discrete
-me_disc <- marginal_effects(fit, X, discrete_vars = 4)
+## Treat covariate x4 as discrete
+me_disc <- marginal_effects(fit,
+                            target_covariates = c(x4 = "discrete"))
 me_disc
 
 
@@ -74,5 +76,5 @@ head(fit_w$predictions)
 # ## Use 2 threads
 # fit2 <- jocf(Y, X, num.trees = 100, num.threads = 2)
 # preds2 <- predict(fit2, X_new, num.threads = 2)
-# me2 <- marginal_effects(fit2, X, num.threads = 2)
+# me2 <- marginal_effects(fit2, num.threads = 2)
 

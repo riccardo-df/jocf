@@ -53,7 +53,7 @@ preds$classification$prob      # probability-based classification
 preds$classification$vote      # majority-vote classification
 
 ## Average marginal effects
-me <- marginal_effects(fit, X)
+me <- marginal_effects(fit)
 me
 ```
 

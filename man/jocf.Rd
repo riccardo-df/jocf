@@ -110,6 +110,8 @@ variance estimation (\code{NULL} when non-honest).}
 \item{\code{M}}{Integer; number of outcome classes.}
 \item{\code{num.trees}}{Integer; number of trees grown.}
 \item{\code{k}}{Integer; number of training covariates.}
+\item{\code{X_train}}{Factor-encoded numeric training matrix (n x k); used as
+the default \code{data} argument by \code{\link[=marginal_effects.jocf]{marginal_effects.jocf()}}.}
 \item{\code{tuning.output}}{\code{NULL} when tuning is off, otherwise a named list
 with components \code{status} (\code{"tuned"}, \code{"default"}, or \code{"failure"}),
 \code{params} (selected parameter values), \code{error} (debiased OOB error),

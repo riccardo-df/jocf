@@ -14,7 +14,7 @@
 #' X <- matrix(rnorm(n * 3), ncol = 3)
 #' Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
 #' fit <- jocf(Y, X, num.trees = 50)
-#' me <- marginal_effects(fit, X)
+#' me <- marginal_effects(fit)
 #' me
 #'
 #' @export
@@ -48,24 +48,25 @@ marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 #' `target_covariates` produces a `warning()`.
 #'
 #' @param object A fitted object of class `"jocf"`.
-#' @param data Numeric matrix or data.frame with `object$k` columns.  Typically
-#'   the training data, but any evaluation data with the same column layout is
-#'   accepted.
+#' @param data Numeric matrix or data.frame with `object$k` columns, or `NULL`
+#'   (default).  When `NULL`, the stored training data (`object$X_train`) is
+#'   used.  Any evaluation data with the same column layout is accepted.
 #' @param eval Character; where to evaluate the marginal effects.
 #'   `"mean"` (default) averages individual effects over all rows of `data`;
 #'   `"atmean"` evaluates at the column means; `"atmedian"` evaluates at the
 #'   column medians.
-#' @param target_covariates Integer vector of 1-based column indices selecting
-#'   which covariates to differentiate.  `NULL` (default) uses all columns.
-#' @param discrete_vars Integer vector of 1-based column indices identifying
-#'   discrete covariates.  Default `NULL` (all continuous).
+#' @param target_covariates Named character vector selecting which covariates to
+#'   differentiate, or `NULL` (default).  Names must match the training column
+#'   names; values must be `"continuous"` or `"discrete"`.  For example,
+#'   `c(x1 = "continuous", x4 = "discrete")`.  When `NULL`, all numeric columns
+#'   are used (all treated as continuous; factor columns are auto-excluded).
 #' @param bandwidth Positive scalar bandwidth for the continuous finite
-#'   difference.  Default `0.001`.
+#'   difference.  Default `1`.
 #' @param num.threads Positive integer or `NULL`. Number of OpenMP threads.
 #'   `NULL` (default) uses all available cores.
 #' @param ... Currently unused.
 #'
-#' @return An object of class `"jocf_me"` — a list with components:
+#' @return An object of class `"jocf_me"` --- a list with components:
 #' \describe{
 #'   \item{`effects`}{(k_target x M) numeric matrix.  Row \eqn{j}, column
 #'     \eqn{m} is the marginal effect of that covariate on \eqn{P(Y = m)}.
@@ -77,8 +78,9 @@ marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 #'   \item{`ci.upper`}{(k_target x M) numeric matrix of upper bounds of 95\%
 #'     confidence intervals (`NULL` when non-honest).}
 #'   \item{`eval`}{The `eval` argument used.}
-#'   \item{`target_covariates`}{1-based integer vector of differentiated covariates.}
-#'   \item{`discrete_vars`}{Integer vector passed as `discrete_vars`.}
+#'   \item{`target_covariates`}{Named character vector of differentiated
+#'     covariates (names = column names, values = `"continuous"` or
+#'     `"discrete"`).}
 #'   \item{`bandwidth`}{Bandwidth used for continuous variables.}
 #'   \item{`call`}{The matched call.}
 #' }
@@ -91,30 +93,30 @@ marginal_effects <- function(object, ...) UseMethod("marginal_effects")
 #' Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
 #' fit <- jocf(Y, X, num.trees = 50)
 #'
-#' ## Average marginal effects (all covariates)
-#' me <- marginal_effects(fit, X)
+#' ## Average marginal effects (all covariates, uses training data)
+#' me <- marginal_effects(fit)
 #' me
 #'
 #' ## Evaluate at the mean and for selected covariates only
-#' me_atmean <- marginal_effects(fit, X, eval = "atmean",
-#'                               target_covariates = c(1, 3))
+#' me_atmean <- marginal_effects(fit, eval = "atmean",
+#'                               target_covariates = c(X1 = "continuous",
+#'                                                     X3 = "continuous"))
 #' me_atmean
 #'
 #' \donttest{
 #' ## Honest forest: marginal effects with standard errors
 #' fit_h <- jocf(Y, X, num.trees = 50, honesty = TRUE)
-#' me_h <- marginal_effects(fit_h, X)
+#' me_h <- marginal_effects(fit_h)
 #' me_h           # prints effects + standard errors + 95% CIs
 #' me_h$std.error # (k_target x M) matrix of SEs
 #' }
 #'
 #' @export
 marginal_effects.jocf <- function(object,
-                                   data,
+                                   data              = NULL,
                                    eval              = c("mean", "atmean", "atmedian"),
                                    target_covariates = NULL,
-                                   discrete_vars     = NULL,
-                                   bandwidth         = 0.001,
+                                   bandwidth         = 1,
                                    num.threads       = NULL,
                                    ...) {
   cl   <- match.call()
@@ -123,20 +125,32 @@ marginal_effects.jocf <- function(object,
   if (!inherits(object, "jocf"))
     stop('`object` must be of class "jocf".', call. = FALSE)
 
-  # Encode factors using stored training-time metadata
-  encoded <- encode_factors(data, factor_info = object$factor_info)
-  data <- encoded$X_encoded
-  if (ncol(data) != object$k)
+  # Resolve data: NULL -> stored training data (already encoded)
+  if (is.null(data)) {
+    if (is.null(object$X_train))
+      stop("No training data stored in `object`. Pass `data` explicitly.",
+           call. = FALSE)
+    data_mat <- object$X_train
+  } else {
+    encoded  <- encode_factors(data, factor_info = object$factor_info)
+    data_mat <- encoded$X_encoded
+  }
+
+  if (ncol(data_mat) != object$k)
     stop(sprintf("`data` must have %d column(s) (same as training X).",
                  object$k), call. = FALSE)
-  if (anyNA(data))
+  if (anyNA(data_mat))
     stop("Missing values are not allowed in `data`.", call. = FALSE)
 
   if (!is.numeric(bandwidth) || length(bandwidth) != 1L || bandwidth <= 0)
     stop("`bandwidth` must be a single positive number.", call. = FALSE)
 
-  k <- ncol(data)
+  k <- ncol(data_mat)
   M <- object$M
+
+  # Canonical column names
+  col_nms <- object$col_names
+  if (is.null(col_nms)) col_nms <- paste0("X", seq_len(k))
 
   # Identify factor columns (finite-difference is not meaningful for these)
   factor_cols <- integer(0)
@@ -144,14 +158,12 @@ marginal_effects.jocf <- function(object,
     factor_cols <- which(vapply(object$factor_info, Negate(is.null), logical(1)))
   }
 
-  # Resolve target_covariates to a sorted, unique, 1-based integer vector
+  # Resolve target_covariates
   if (is.null(target_covariates)) {
     target_1based <- seq_len(k)
     # Auto-exclude factor columns
     if (length(factor_cols) > 0) {
       target_1based <- setdiff(target_1based, factor_cols)
-      col_nms <- colnames(data)
-      if (is.null(col_nms)) col_nms <- paste0("X", seq_len(k))
       message(sprintf(
         "Factor/logical covariate(s) %s excluded from marginal effects.",
         paste0("\"", col_nms[factor_cols], "\"", collapse = ", ")))
@@ -159,47 +171,62 @@ marginal_effects.jocf <- function(object,
     if (length(target_1based) == 0L)
       stop("All covariates are factors; marginal effects require at least one numeric covariate.",
            call. = FALSE)
+    is_discrete_target <- logical(length(target_1based))
+    tc_display <- setNames(rep("continuous", length(target_1based)),
+                           col_nms[target_1based])
   } else {
-    target_1based <- sort(unique(as.integer(target_covariates)))
-    if (any(target_1based < 1L) || any(target_1based > k))
-      stop("`target_covariates` values must be in 1..ncol(data).", call. = FALSE)
-    # Warn and drop user-requested factor columns
+    # Validate named character vector
+    if (!is.character(target_covariates) || is.null(names(target_covariates)))
+      stop("`target_covariates` must be a named character vector ",
+           "(names = column names, values = \"continuous\" or \"discrete\").",
+           call. = FALSE)
+    if (!all(target_covariates %in% c("continuous", "discrete")))
+      stop('All `target_covariates` values must be "continuous" or "discrete".',
+           call. = FALSE)
+    tc_names  <- names(target_covariates)
+    bad_names <- setdiff(tc_names, col_nms)
+    if (length(bad_names) > 0)
+      stop(sprintf(
+        "`target_covariates` names not found in training data: %s. Available: %s.",
+        paste0("\"", bad_names, "\"", collapse = ", "),
+        paste0("\"", col_nms, "\"", collapse = ", ")),
+        call. = FALSE)
+
+    # Resolve names to 1-based column indices (preserve user order)
+    target_1based <- match(tc_names, col_nms)
+
+    # Warn and drop factor columns
     requested_factors <- intersect(target_1based, factor_cols)
     if (length(requested_factors) > 0) {
-      col_nms <- colnames(data)
-      if (is.null(col_nms)) col_nms <- paste0("X", seq_len(k))
       warning(sprintf(
         "Factor/logical covariate(s) %s excluded from marginal effects.",
         paste0("\"", col_nms[requested_factors], "\"", collapse = ", ")),
         call. = FALSE)
-      target_1based <- setdiff(target_1based, requested_factors)
+      keep <- !(target_1based %in% requested_factors)
+      target_covariates <- target_covariates[keep]
+      target_1based     <- target_1based[keep]
     }
     if (length(target_1based) == 0L)
       stop("All requested `target_covariates` are factors; marginal effects require at least one numeric covariate.",
            call. = FALSE)
+
+    is_discrete_target <- unname(target_covariates) == "discrete"
+    tc_display <- target_covariates
   }
+
   target_0based <- target_1based - 1L
   k_target      <- length(target_1based)
 
-  # Discrete indicator aligned with target_covariates
-  is_discrete_target <- logical(k_target)
-  if (!is.null(discrete_vars)) {
-    discrete_vars <- as.integer(discrete_vars)
-    if (any(discrete_vars < 1L) || any(discrete_vars > k))
-      stop("`discrete_vars` values must be in 1..ncol(data).", call. = FALSE)
-    is_discrete_target <- target_1based %in% discrete_vars
-  }
-
   # Step sizes for continuous covariates (bandwidth * sample SD)
-  sds         <- apply(data, 2, sd)
+  sds           <- apply(data_mat, 2, sd)
   sds[sds == 0] <- 1.0   # guard against zero-variance columns
-  h_vec       <- bandwidth * sds[target_1based]
+  h_vec         <- bandwidth * sds[target_1based]
 
   # Build the evaluation matrix
   X_eval <- switch(eval,
-    "mean"     = data,
-    "atmean"   = matrix(colMeans(data),          nrow = 1L),
-    "atmedian" = matrix(apply(data, 2, median),  nrow = 1L)
+    "mean"     = data_mat,
+    "atmean"   = matrix(colMeans(data_mat),          nrow = 1L),
+    "atmedian" = matrix(apply(data_mat, 2, median),  nrow = 1L)
   )
 
   # Delegate to C++ engine
@@ -238,8 +265,6 @@ marginal_effects.jocf <- function(object,
   }
 
   # Attach names
-  col_nms <- colnames(data)
-  if (is.null(col_nms)) col_nms <- paste0("X", seq_len(k))
   rownames(effects) <- col_nms[target_1based]
   colnames(effects) <- paste0("P(Y=", seq_len(M), ")")
   if (!is.null(se_mat)) {
@@ -258,8 +283,7 @@ marginal_effects.jocf <- function(object,
       ci.lower          = ci_lo,
       ci.upper          = ci_hi,
       eval              = eval,
-      target_covariates = target_1based,
-      discrete_vars     = discrete_vars,
+      target_covariates = tc_display,
       bandwidth         = bandwidth,
       call              = cl
     ),
@@ -298,4 +322,59 @@ print.jocf_me <- function(x, digits = 4L, ...) {
     print(round(x$ci.upper, digits))
   }
   invisible(x)
+}
+
+
+#' Summary method for jocf_me objects
+#'
+#' For honest models, displays a combined table per outcome class with effects,
+#' standard errors, z-values, and 95% confidence interval bounds. For
+#' non-honest models, displays the effects matrix (same as [print.jocf_me()]).
+#'
+#' @param object A `"jocf_me"` object.
+#' @param digits Number of significant digits. Default `4`.
+#' @param ... Currently unused.
+#'
+#' @return Invisibly returns `object`.
+#' @export
+summary.jocf_me <- function(object, digits = 4L, ...) {
+  M <- ncol(object$effects)
+  k <- nrow(object$effects)
+  header <- switch(object$eval,
+    "mean"     = "Average Marginal Effects",
+    "atmean"   = "Marginal Effects at Mean",
+    "atmedian" = "Marginal Effects at Median"
+  )
+  cat(sprintf("%s \u2014 jocf  [eval = \"%s\"]\n", header, object$eval))
+  cat(sprintf("  %d covariate(s), %d outcome class(es)\n", k, M))
+
+  if (!is.null(object$std.error)) {
+    rn <- rownames(object$effects)
+    if (is.null(rn)) rn <- paste0("X", seq_len(k))
+
+    for (m in seq_len(M)) {
+      cat(sprintf("\n--- P(Y=%d) ---\n", m))
+      eff <- object$effects[, m]
+      se  <- object$std.error[, m]
+      z   <- eff / se
+      z[!is.finite(z)] <- NA_real_
+      tbl <- data.frame(
+        Effect       = round(eff, digits),
+        Std.Error    = round(se, digits),
+        `z value`    = round(z, digits),
+        `CI 95% lower` = round(object$ci.lower[, m], digits),
+        `CI 95% upper` = round(object$ci.upper[, m], digits),
+        check.names  = FALSE
+      )
+      rownames(tbl) <- rn
+      print(tbl)
+    }
+  } else {
+    cat("\n")
+    mat <- object$effects
+    if (is.null(rownames(mat))) rownames(mat) <- paste0("X", seq_len(k))
+    print(round(mat, digits))
+  }
+
+  invisible(object)
 }

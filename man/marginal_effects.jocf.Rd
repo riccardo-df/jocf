@@ -6,11 +6,10 @@
 \usage{
 \method{marginal_effects}{jocf}(
   object,
-  data,
+  data = NULL,
   eval = c("mean", "atmean", "atmedian"),
   target_covariates = NULL,
-  discrete_vars = NULL,
-  bandwidth = 0.001,
+  bandwidth = 1,
   num.threads = NULL,
   ...
 )
@@ -18,23 +17,23 @@
 \arguments{
 \item{object}{A fitted object of class \code{"jocf"}.}
 
-\item{data}{Numeric matrix or data.frame with \code{object$k} columns.  Typically
-the training data, but any evaluation data with the same column layout is
-accepted.}
+\item{data}{Numeric matrix or data.frame with \code{object$k} columns, or \code{NULL}
+(default).  When \code{NULL}, the stored training data (\code{object$X_train}) is
+used.  Any evaluation data with the same column layout is accepted.}
 
 \item{eval}{Character; where to evaluate the marginal effects.
 \code{"mean"} (default) averages individual effects over all rows of \code{data};
 \code{"atmean"} evaluates at the column means; \code{"atmedian"} evaluates at the
 column medians.}
 
-\item{target_covariates}{Integer vector of 1-based column indices selecting
-which covariates to differentiate.  \code{NULL} (default) uses all columns.}
-
-\item{discrete_vars}{Integer vector of 1-based column indices identifying
-discrete covariates.  Default \code{NULL} (all continuous).}
+\item{target_covariates}{Named character vector selecting which covariates to
+differentiate, or \code{NULL} (default).  Names must match the training column
+names; values must be \code{"continuous"} or \code{"discrete"}.  For example,
+\code{c(x1 = "continuous", x4 = "discrete")}.  When \code{NULL}, all numeric columns
+are used (all treated as continuous; factor columns are auto-excluded).}
 
 \item{bandwidth}{Positive scalar bandwidth for the continuous finite
-difference.  Default \code{0.001}.}
+difference.  Default \code{1}.}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads.
 \code{NULL} (default) uses all available cores.}
@@ -42,7 +41,7 @@ difference.  Default \code{0.001}.}
 \item{...}{Currently unused.}
 }
 \value{
-An object of class \code{"jocf_me"} — a list with components:
+An object of class \code{"jocf_me"} --- a list with components:
 \describe{
 \item{\code{effects}}{(k_target x M) numeric matrix.  Row \eqn{j}, column
 \eqn{m} is the marginal effect of that covariate on \eqn{P(Y = m)}.
@@ -54,8 +53,9 @@ confidence intervals (\code{NULL} when non-honest).}
 \item{\code{ci.upper}}{(k_target x M) numeric matrix of upper bounds of 95\\%
 confidence intervals (\code{NULL} when non-honest).}
 \item{\code{eval}}{The \code{eval} argument used.}
-\item{\code{target_covariates}}{1-based integer vector of differentiated covariates.}
-\item{\code{discrete_vars}}{Integer vector passed as \code{discrete_vars}.}
+\item{\code{target_covariates}}{Named character vector of differentiated
+covariates (names = column names, values = \code{"continuous"} or
+\code{"discrete"}).}
 \item{\code{bandwidth}}{Bandwidth used for continuous variables.}
 \item{\code{call}}{The matched call.}
 }
@@ -95,19 +95,20 @@ X <- matrix(rnorm(n * 3), ncol = 3)
 Y <- sample(1:3, n, replace = TRUE, prob = c(0.3, 0.5, 0.2))
 fit <- jocf(Y, X, num.trees = 50)
 
-## Average marginal effects (all covariates)
-me <- marginal_effects(fit, X)
+## Average marginal effects (all covariates, uses training data)
+me <- marginal_effects(fit)
 me
 
 ## Evaluate at the mean and for selected covariates only
-me_atmean <- marginal_effects(fit, X, eval = "atmean",
-                              target_covariates = c(1, 3))
+me_atmean <- marginal_effects(fit, eval = "atmean",
+                              target_covariates = c(X1 = "continuous",
+                                                    X3 = "continuous"))
 me_atmean
 
 \donttest{
 ## Honest forest: marginal effects with standard errors
 fit_h <- jocf(Y, X, num.trees = 50, honesty = TRUE)
-me_h <- marginal_effects(fit_h, X)
+me_h <- marginal_effects(fit_h)
 me_h           # prints effects + standard errors + 95\% CIs
 me_h$std.error # (k_target x M) matrix of SEs
 }

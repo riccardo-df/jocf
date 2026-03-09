@@ -101,29 +101,33 @@ preds$classification$vote
 
 `marginal_effects()` computes nonparametric marginal effects via finite
 differences.  For continuous covariates, it uses symmetric finite differences;
-for discrete covariates, unit changes.
+for discrete covariates, unit changes.  By default the training data stored in
+the fitted object is used.
 
 ```{r me}
 ## Marginal effects averaged over all training observations
-me <- marginal_effects(fit, X)
+me <- marginal_effects(fit)
 me
 ```
 
 You can evaluate at specific summary points and restrict to a subset of
-covariates:
+covariates via a named character vector whose names are column names and values
+are `"continuous"` or `"discrete"`:
 
 ```{r me_options}
-## Marginal effects evaluated at the covariate means, for covariates 1 and 3 only
-me_atmean <- marginal_effects(fit, X, eval = "atmean",
-                              target_covariates = c(1, 3))
+## Marginal effects evaluated at the covariate means, for x1 and x3 only
+me_atmean <- marginal_effects(fit, eval = "atmean",
+                              target_covariates = c(x1 = "continuous",
+                                                    x3 = "continuous"))
 me_atmean
 ```
 
-If some covariates are discrete, pass their column indices via `discrete_vars`:
+To mark a covariate as discrete, set its value to `"discrete"`:
 
 ```{r me_discrete}
-## Treat covariate 4 as discrete
-me_disc <- marginal_effects(fit, X, discrete_vars = 4)
+## Treat covariate x4 as discrete
+me_disc <- marginal_effects(fit,
+                            target_covariates = c(x4 = "discrete"))
 me_disc
 ```
 
@@ -204,7 +208,7 @@ When the model is honest, `marginal_effects()` automatically returns
 standard errors alongside the AME:
 
 ```{r honest_me}
-me_h <- marginal_effects(fit_h, X)
+me_h <- marginal_effects(fit_h)
 me_h
 ```
 
@@ -221,5 +225,5 @@ By default, all available cores are used.  Control the number of threads with
 ## Use 2 threads
 fit2 <- jocf(Y, X, num.trees = 100, num.threads = 2)
 preds2 <- predict(fit2, X_new, num.threads = 2)
-me2 <- marginal_effects(fit2, X, num.threads = 2)
+me2 <- marginal_effects(fit2, num.threads = 2)
 ```

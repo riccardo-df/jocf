@@ -1,4 +1,4 @@
-#' @importFrom stats predict sd median plogis rnorm rbinom rlogis quantile
+#' @importFrom stats predict sd median plogis rnorm rbinom rlogis quantile setNames
 NULL
 
 #' Resolve num.threads to an integer for C++ (0 = all available cores)
