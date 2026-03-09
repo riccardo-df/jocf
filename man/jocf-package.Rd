@@ -13,7 +13,8 @@ splitting criterion.  Unlike the published \pkg{ocf} package, which grows
 is equivalent to minimising total CART Gini impurity (Proposition 1 in
 \code{vignette("jocf-theory")}).  The single-forest structure additionally
 enables a majority-vote classifier that is not available to multi-forest
-approaches.
+approaches.  Honest forests (\code{honesty = TRUE}) provide weight-based
+standard errors for predicted probabilities and marginal effects.
 }
 \seealso{
 \itemize{

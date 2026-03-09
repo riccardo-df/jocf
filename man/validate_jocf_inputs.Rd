@@ -13,7 +13,8 @@ validate_jocf_inputs(
   sample.fraction,
   mtry,
   splitting.rule,
-  honesty
+  honesty,
+  honesty.fraction = 0.5
 )
 }
 \arguments{
@@ -33,7 +34,10 @@ validate_jocf_inputs(
 
 \item{splitting.rule}{Character, one of \code{"simple"} or \code{"weighted"}.}
 
-\item{honesty}{Logical; must be \code{FALSE} (not yet implemented).}
+\item{honesty}{Logical; \code{TRUE} enables honest splitting.}
+
+\item{honesty.fraction}{Numeric in (0, 1); fraction allocated to honesty
+sample.  Only validated when \code{honesty = TRUE}.}
 }
 \value{
 Invisibly returns \code{NULL}. Stops with an informative message on

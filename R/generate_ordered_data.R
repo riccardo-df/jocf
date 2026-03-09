@@ -36,6 +36,12 @@
 #'     \eqn{P(Y = m \mid X_i)} from the ordered logit model.}
 #'   \item{`marginal_probs`}{The (possibly defaulted) probability vector
 #'     used to set the cutpoints.}
+#'   \item{`true_me_atmean`}{(6 x M) matrix of true marginal effects evaluated
+#'     at \code{colMeans(X)}.  Continuous covariates use the analytic derivative;
+#'     discrete covariates use the unit-difference
+#'     \eqn{P(Y=m \mid x_j=1) - P(Y=m \mid x_j=0)}.}
+#'   \item{`true_me_atmedian`}{Same as `true_me_atmean` but evaluated at
+#'     column medians of \code{X}.}
 #' }
 #'
 #' @examples
@@ -52,7 +58,7 @@
 #' d3 <- generate_ordered_data(500, n_categories = 4)
 #' table(d3$sample$Y)
 #'
-#' @importFrom stats plogis rnorm rbinom rlogis quantile
+#' @importFrom stats plogis dlogis rnorm rbinom rlogis quantile median
 #' @export
 generate_ordered_data <- function(n,
                                   n_categories   = 3L,
@@ -129,9 +135,51 @@ generate_ordered_data <- function(n,
     cum_prob_prev <- cum_prob_cur
   }
 
+  ## --- True marginal effects ------------------------------------------------
+  beta <- c(1, 1, 0.5, 0.5, 0, 0)
+  is_discrete <- c(FALSE, TRUE, FALSE, TRUE, FALSE, TRUE)  # x2, x4, x6
+  cov_names <- paste0("x", 1:6)
+  class_names <- paste0("Y", seq_len(M))
+  zeta <- c(-Inf, cutpoints, Inf)   # length M+1
+
+  X_matrix <- as.matrix(sample_df[, cov_names])
+  x_mean   <- colMeans(X_matrix)
+  x_median <- apply(X_matrix, 2, median)
+
+  compute_true_me <- function(x_eval) {
+    me <- matrix(0, nrow = 6, ncol = M)
+    g_eval <- sum(x_eval * beta)
+    for (j in seq_len(6)) {
+      if (is_discrete[j]) {
+        # Unit difference: P(Y=m | x_j=1, rest) - P(Y=m | x_j=0, rest)
+        g1 <- g_eval - x_eval[j] * beta[j] + 1 * beta[j]
+        g0 <- g_eval - x_eval[j] * beta[j] + 0 * beta[j]
+        for (m in seq_len(M)) {
+          p1 <- plogis(zeta[m + 1] - g1) - plogis(zeta[m] - g1)
+          p0 <- plogis(zeta[m + 1] - g0) - plogis(zeta[m] - g0)
+          me[j, m] <- p1 - p0
+        }
+      } else {
+        # Analytic derivative: [dlogis(zeta_{m-1} - g) - dlogis(zeta_m - g)] * beta_j
+        for (m in seq_len(M)) {
+          me[j, m] <- (dlogis(zeta[m] - g_eval) -
+                        dlogis(zeta[m + 1] - g_eval)) * beta[j]
+        }
+      }
+    }
+    rownames(me) <- cov_names
+    colnames(me) <- class_names
+    me
+  }
+
+  true_me_atmean   <- compute_true_me(x_mean)
+  true_me_atmedian <- compute_true_me(x_median)
+
   list(
-    sample         = sample_df,
-    true_probs     = true_probs,
-    marginal_probs = marginal_probs
+    sample           = sample_df,
+    true_probs       = true_probs,
+    marginal_probs   = marginal_probs,
+    true_me_atmean   = true_me_atmean,
+    true_me_atmedian = true_me_atmedian
   )
 }

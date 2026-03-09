@@ -25,6 +25,12 @@ A list with components:
 \eqn{P(Y = m \mid X_i)} from the ordered logit model.}
 \item{\code{marginal_probs}}{The (possibly defaulted) probability vector
 used to set the cutpoints.}
+\item{\code{true_me_atmean}}{(6 x M) matrix of true marginal effects evaluated
+at \code{colMeans(X)}.  Continuous covariates use the analytic derivative;
+discrete covariates use the unit-difference
+\eqn{P(Y=m \mid x_j=1) - P(Y=m \mid x_j=0)}.}
+\item{\code{true_me_atmedian}}{Same as \code{true_me_atmean} but evaluated at
+column medians of \code{X}.}
 }
 }
 \description{

@@ -1,5 +1,15 @@
 # jocf 0.0.0.9000
 
+* **Marginal effects refinements**: renamed `omega` → `bandwidth`, renamed
+  `$AME` → `$effects`, added `$ci.lower` / `$ci.upper` (95% CIs) alongside
+  `$std.error` for honest models.  Print method adapts header to eval mode.
+* **Honesty and inference** (Phase 4): `jocf(..., honesty = TRUE)` grows trees
+  on a training subsample and repopulates leaves from a held-out honesty sample.
+  - `predict.jocf(..., variance = TRUE)` computes weight-based variance
+    estimates and standard errors for each predicted probability.
+  - `marginal_effects.jocf()` returns `$std.error`, `$ci.lower`, `$ci.upper`
+    for marginal effects when the model is honest.
+  - New argument `honesty.fraction` (default 0.5) controls the train/honesty split.
 * **Built-in hyperparameter tuning**: `jocf(..., tune.parameters = "all")`
   tunes `mtry`, `min.node.size`, and `sample.fraction` via GRF-style debiased
   OOB error and a Kriging surrogate (`DiceKriging`).  New arguments:

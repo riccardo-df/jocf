@@ -99,12 +99,12 @@ preds$classification$vote
 
 ## Marginal effects
 
-`marginal_effects()` computes nonparametric average marginal effects (AME)
-following Lechner (2019).  For continuous covariates, it uses finite differences;
+`marginal_effects()` computes nonparametric marginal effects via finite
+differences.  For continuous covariates, it uses symmetric finite differences;
 for discrete covariates, unit changes.
 
 ```{r me}
-## AME averaged over all training observations
+## Marginal effects averaged over all training observations
 me <- marginal_effects(fit, X)
 me
 ```
@@ -113,7 +113,7 @@ You can evaluate at specific summary points and restrict to a subset of
 covariates:
 
 ```{r me_options}
-## AME evaluated at the covariate means, for covariates 1 and 3 only
+## Marginal effects evaluated at the covariate means, for covariates 1 and 3 only
 me_atmean <- marginal_effects(fit, X, eval = "atmean",
                               target_covariates = c(1, 3))
 me_atmean
@@ -171,6 +171,45 @@ fit_mtry <- jocf(Y, X, num.trees = 100,
                  tune.parameters = c("mtry"))
 fit_mtry$tuning.output$params$mtry
 ```
+
+## Honest forests with inference
+
+Setting `honesty = TRUE` enables sample splitting: trees are grown on one
+subsample ($S^{\text{tr}}$) and leaf predictions are computed from a held-out
+honesty subsample ($S^{\text{hon}}$).  This enables valid variance estimation.
+
+```{r honesty}
+fit_h <- jocf(Y, X, num.trees = 100, honesty = TRUE, honesty.fraction = 0.5)
+fit_h$honesty
+```
+
+### Predictions with standard errors
+
+Pass `variance = TRUE` to `predict()` to obtain weight-based variance
+estimates and standard errors for each predicted probability:
+
+```{r honest_predict}
+preds_h <- predict(fit_h, X_new, variance = TRUE)
+
+## Predicted probabilities
+head(preds_h$probabilities)
+
+## Standard errors
+head(preds_h$std.error)
+```
+
+### Marginal effects with standard errors
+
+When the model is honest, `marginal_effects()` automatically returns
+standard errors alongside the AME:
+
+```{r honest_me}
+me_h <- marginal_effects(fit_h, X)
+me_h
+```
+
+See `vignette("jocf-theory")` for the mathematical details of the
+weight-based inference procedure.
 
 ## Parallelism
 

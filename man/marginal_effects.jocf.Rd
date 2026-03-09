@@ -10,7 +10,7 @@
   eval = c("mean", "atmean", "atmedian"),
   target_covariates = NULL,
   discrete_vars = NULL,
-  omega = 0.001,
+  bandwidth = 0.001,
   num.threads = NULL,
   ...
 )
@@ -33,8 +33,8 @@ which covariates to differentiate.  \code{NULL} (default) uses all columns.}
 \item{discrete_vars}{Integer vector of 1-based column indices identifying
 discrete covariates.  Default \code{NULL} (all continuous).}
 
-\item{omega}{Positive scalar bandwidth for the continuous finite difference.
-Default \code{0.001}.}
+\item{bandwidth}{Positive scalar bandwidth for the continuous finite
+difference.  Default \code{0.001}.}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads.
 \code{NULL} (default) uses all available cores.}
@@ -44,27 +44,33 @@ Default \code{0.001}.}
 \value{
 An object of class \code{"jocf_me"} — a list with components:
 \describe{
-\item{\code{AME}}{(k_target x M) numeric matrix.  Row \eqn{j}, column \eqn{m}
-is the AME of that covariate on \eqn{P(Y = m)}.
+\item{\code{effects}}{(k_target x M) numeric matrix.  Row \eqn{j}, column
+\eqn{m} is the marginal effect of that covariate on \eqn{P(Y = m)}.
 Rows sum to zero across classes by construction.}
+\item{\code{std.error}}{(k_target x M) numeric matrix of standard errors
+(only when the model was fit with \code{honesty = TRUE}; \code{NULL} otherwise).}
+\item{\code{ci.lower}}{(k_target x M) numeric matrix of lower bounds of 95\\%
+confidence intervals (\code{NULL} when non-honest).}
+\item{\code{ci.upper}}{(k_target x M) numeric matrix of upper bounds of 95\\%
+confidence intervals (\code{NULL} when non-honest).}
 \item{\code{eval}}{The \code{eval} argument used.}
 \item{\code{target_covariates}}{1-based integer vector of differentiated covariates.}
 \item{\code{discrete_vars}}{Integer vector passed as \code{discrete_vars}.}
-\item{\code{omega}}{Bandwidth used for continuous variables.}
+\item{\code{bandwidth}}{Bandwidth used for continuous variables.}
 \item{\code{call}}{The matched call.}
 }
 }
 \description{
-Computes average marginal effects (AME) following Lechner (2019).
+Computes marginal effects via finite differences.
 For each target covariate \eqn{j} and each evaluation point \eqn{w_i}:
 }
 \details{
 \itemize{
 \item \strong{Continuous} covariate \eqn{j}:
 \deqn{\widehat{\partial}_j p_m(w_i) =
-    \frac{\hat{p}_m(w_i + \omega\,\hat{\sigma}_j\,e_j)
-          - \hat{p}_m(w_i - \omega\,\hat{\sigma}_j\,e_j)}
-         {2\,\omega\,\hat{\sigma}_j}}
+    \frac{\hat{p}_m(w_i + h\,\hat{\sigma}_j\,e_j)
+          - \hat{p}_m(w_i - h\,\hat{\sigma}_j\,e_j)}
+         {2\,h\,\hat{\sigma}_j}}
 where \eqn{\hat{\sigma}_j} is the sample standard deviation of covariate
 \eqn{j} and \eqn{e_j} is the \eqn{j}-th unit vector.
 \item \strong{Discrete} covariate \eqn{j}:
@@ -73,8 +79,8 @@ where \eqn{\hat{\sigma}_j} is the sample standard deviation of covariate
     - \hat{p}_m(w_i \text{ with } x_j = \lfloor x_{ij} \rfloor)}
 }
 
-The AME for covariate \eqn{j} and class \eqn{m} is the average of these
-individual effects over all evaluation points.
+The marginal effect for covariate \eqn{j} and class \eqn{m} is the average
+of these individual effects over all evaluation points.
 
 Factor and logical covariates are automatically excluded because finite
 differences are not meaningful for categorical variables.  A \code{message()} is
@@ -97,5 +103,13 @@ me
 me_atmean <- marginal_effects(fit, X, eval = "atmean",
                               target_covariates = c(1, 3))
 me_atmean
+
+\donttest{
+## Honest forest: marginal effects with standard errors
+fit_h <- jocf(Y, X, num.trees = 50, honesty = TRUE)
+me_h <- marginal_effects(fit_h, X)
+me_h           # prints effects + standard errors + 95\% CIs
+me_h$std.error # (k_target x M) matrix of SEs
+}
 
 }

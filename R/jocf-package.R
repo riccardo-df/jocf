@@ -7,7 +7,8 @@
 #' is equivalent to minimising total CART Gini impurity (Proposition 1 in
 #' `vignette("jocf-theory")`).  The single-forest structure additionally
 #' enables a majority-vote classifier that is not available to multi-forest
-#' approaches.
+#' approaches.  Honest forests (`honesty = TRUE`) provide weight-based
+#' standard errors for predicted probabilities and marginal effects.
 #'
 #' @seealso
 #' * [jocf()] to fit a forest and obtain in-sample predictions and

@@ -77,6 +77,79 @@ marginal_effects_cpp <- function(forest, X_eval, target_vars, is_discrete, h_vec
     .Call(`_jocf_marginal_effects_cpp`, forest, X_eval, target_vars, is_discrete, h_vec, M, num_threads)
 }
 
+#' Grow an honest joint OCF random forest
+#'
+#' Internal C++ engine for honest forests.  Trees are grown on S^tr and
+#' repopulated with S^hon for leaf predictions.  Each tree stores sorted-by-
+#' leaf honesty data for weight-based inference at predict time.
+#'
+#' @param Y Integer vector of class labels (1..M), length n.
+#' @param X Numeric matrix of covariates (n x k).
+#' @param num_trees Number of trees.
+#' @param min_node_size Minimum observations per terminal node.
+#' @param max_depth Maximum tree depth (-1 = unlimited).
+#' @param n_sub_tr Subsample size drawn from S^tr (without replacement).
+#' @param mtry Number of candidate features at each split.
+#' @param M Number of outcome classes.
+#' @param lambda Numeric weight vector of length M.
+#' @param tr_indices Integer vector of 0-based training indices.
+#' @param hon_indices Integer vector of 0-based honesty indices.
+#' @param num_threads Number of OpenMP threads (0 = all available).
+#'
+#' @return Named list: `predictions` (n x M), `forest` (list of B trees
+#'   with hon_sorted/hon_offsets), `votes` (n x M integer), `n_hon` (int).
+#' @keywords internal
+#' @export
+grow_forest_honest_cpp <- function(Y, X, num_trees, min_node_size, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads = 0L) {
+    .Call(`_jocf_grow_forest_honest_cpp`, Y, X, num_trees, min_node_size, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads)
+}
+
+#' Predict with variance estimation from an honest jocf forest
+#'
+#' Weight-based variance estimation: for each test point, computes alpha weights
+#' from honest leaf memberships across all trees, then derives variance from
+#' the weighted sum of squared indicator deviations.
+#'
+#' @param forest List of honest tree structures.
+#' @param X_new Numeric matrix of new observations (n_test x k).
+#' @param Y_hon Integer vector of 0-indexed class labels for honesty sample.
+#' @param n_hon Number of honesty observations.
+#' @param M Number of outcome classes.
+#' @param compute_variance Logical; if TRUE compute variance estimates.
+#' @param num_threads Number of OpenMP threads (0 = all available).
+#'
+#' @return Named list: `predictions` (n_test x M), `variance` (n_test x M or
+#'   empty), `votes` (n_test x M integer).
+#' @keywords internal
+#' @export
+predict_honest_cpp <- function(forest, X_new, Y_hon, n_hon, M, compute_variance, num_threads = 0L) {
+    .Call(`_jocf_predict_honest_cpp`, forest, X_new, Y_hon, n_hon, M, compute_variance, num_threads)
+}
+
+#' Compute marginal effects with standard errors from an honest jocf forest
+#'
+#' Weight-based SE estimation for average marginal effects.  For each eval
+#' point, computes omega_plus and omega_minus weights from perturbed
+#' traversals, then derives pointwise variance from the weighted indicator
+#' differences.
+#'
+#' @param forest List of honest tree structures.
+#' @param X_eval Numeric matrix of evaluation points (n_eval x k).
+#' @param target_vars Integer vector of 0-based column indices.
+#' @param is_discrete Logical vector; TRUE = discrete covariate.
+#' @param h_vec Numeric vector of step sizes for continuous variables.
+#' @param Y_hon Integer vector of 0-indexed class labels for honesty sample.
+#' @param n_hon Number of honesty observations.
+#' @param M Number of outcome classes.
+#' @param num_threads Number of OpenMP threads (0 = all available).
+#'
+#' @return Named list: `AME` (k_target x M), `variance` (k_target x M).
+#' @keywords internal
+#' @export
+marginal_effects_honest_cpp <- function(forest, X_eval, target_vars, is_discrete, h_vec, Y_hon, n_hon, M, num_threads = 0L) {
+    .Call(`_jocf_marginal_effects_honest_cpp`, forest, X_eval, target_vars, is_discrete, h_vec, Y_hon, n_hon, M, num_threads)
+}
+
 #' Compute node impurity Q(C) or Q_w(C)
 #'
 #' Given class-frequency counts for a node, computes the (weighted) average

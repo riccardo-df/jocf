@@ -12,6 +12,8 @@ Description: Estimates conditional choice probabilities and classifications
     rule is equivalent to minimising total CART Gini impurity (Proposition 1
     in the package vignette).  The single-forest structure enables a
     majority-vote classifier not available to multi-forest approaches.
+    Honest forests with sample splitting provide weight-based standard
+    errors for predicted probabilities and marginal effects.
 License: MIT + file LICENSE
 URL: https://github.com/riccardo-df/jocf
 BugReports: https://github.com/riccardo-df/jocf/issues

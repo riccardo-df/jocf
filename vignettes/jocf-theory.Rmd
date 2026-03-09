@@ -198,8 +198,7 @@ classes and majority vote is not defined.
 
 ## Marginal effects
 
-Following Lechner (2019), marginal effects are computed nonparametrically via
-finite differences.
+Marginal effects are computed nonparametrically via finite differences.
 
 ### Continuous covariates
 
@@ -207,13 +206,13 @@ For continuous covariate $j$ at evaluation point $w$:
 
 $$
 \widehat{\partial}_j p_m(w) =
-  \frac{\hat{p}_m(w + \omega \hat{\sigma}_j e_j)
-        - \hat{p}_m(w - \omega \hat{\sigma}_j e_j)}
-       {2 \omega \hat{\sigma}_j},
+  \frac{\hat{p}_m(w + h \hat{\sigma}_j e_j)
+        - \hat{p}_m(w - h \hat{\sigma}_j e_j)}
+       {2 h \hat{\sigma}_j},
 $$
 
 where $\hat{\sigma}_j$ is the sample standard deviation of covariate $j$,
-$e_j$ is the $j$-th unit vector, and $\omega > 0$ is a small bandwidth
+$e_j$ is the $j$-th unit vector, and $h > 0$ is a small bandwidth
 (default 0.001).
 
 ### Discrete covariates
@@ -236,9 +235,78 @@ $$
   \widehat{\partial}_j p_m(w_i).
 $$
 
-## References
+## Honesty and inference
 
-- Lechner, M. (2019). Modified Causal Forests for Estimating Heterogeneous
-  Causal Effects. *arXiv preprint arXiv:1812.09487*.
-- Lechner, M. & Okasa, G. (2019). Random Forest Estimation of the Ordered
-  Choice Model. *arXiv preprint arXiv:1907.02436*.
+### Sample splitting
+
+An honest forest splits the training data into two disjoint subsets:
+
+- $S^{\text{tr}}$: used to grow the tree structure (split selection).
+- $S^{\text{hon}}$: used to populate leaf predictions.
+
+This separation ensures that the observations used for prediction are
+independent of the tree structure, which is necessary for valid inference.
+The `honesty.fraction` parameter (default 0.5) controls the relative size of
+$S^{\text{hon}}$.
+
+### Honest leaf predictions
+
+After tree $b$ is grown on $S^{\text{tr}}$, each honesty observation
+$i \in S^{\text{hon}}$ is dropped through the tree to determine its leaf
+$L_b(w_i)$.  The honest leaf prediction is then
+
+$$
+\hat{p}_{m,b}^{\text{hon}}(w) = \frac{1}{|L_b^{\text{hon}}(w)|}
+  \sum_{i \in L_b^{\text{hon}}(w)} \mathbf{1}(Y_i = m),
+$$
+
+where $L_b^{\text{hon}}(w) = \{i \in S^{\text{hon}} : i \text{ falls in leaf } L_b(w)\}$.
+Empty leaves receive a uniform $1/M$ prediction.
+
+### Weight-based variance estimation
+
+Each honest forest defines a weight function.  For test point $w$, define
+
+$$
+\alpha_i(w) = \frac{1}{B} \sum_{b=1}^{B}
+  \frac{\mathbf{1}(i \in L_b^{\text{hon}}(w))}{|L_b^{\text{hon}}(w)|},
+  \quad i \in S^{\text{hon}}.
+$$
+
+The forest prediction is then $\hat{p}_m(w) = \sum_i \alpha_i(w) \, \mathbf{1}(Y_i = m)$.
+
+The variance of $\hat{p}_m(w)$ is estimated as
+
+$$
+\widehat{\text{Var}}(\hat{p}_m(w)) =
+  \frac{n_{\text{hon}}}{n_{\text{hon}} - 1}
+  \left(
+    \sum_{i} (\alpha_i(w) \, Z_{i,m})^2
+    - \frac{1}{n_{\text{hon}}} \left(\sum_{i} \alpha_i(w) \, Z_{i,m}\right)^2
+  \right),
+$$
+
+where $Z_{i,m} = \mathbf{1}(Y_i = m)$.  This is a plug-in estimator of the
+asymptotic variance of a weighted sum with Bessel correction.
+
+### Standard errors for marginal effects
+
+For the AME of covariate $j$ on class $m$, define the pointwise effect at
+evaluation point $w_i$ as
+
+$$
+\delta_{j,m}(w_i) = \sum_{h \in S^{\text{hon}}}
+  \left(\alpha_h(w_i^+) - \alpha_h(w_i^-)\right) Z_{h,m} \cdot s_j,
+$$
+
+where $w_i^{\pm}$ are the perturbed evaluation points and $s_j$ is the
+appropriate scale factor.  The variance of the AME is then
+
+$$
+\widehat{\text{Var}}(\text{AME}_{j,m}) =
+  \frac{1}{n_{\text{eval}}^2} \sum_{i=1}^{n_{\text{eval}}}
+  \widehat{\text{Var}}(\delta_{j,m}(w_i)),
+$$
+
+where each pointwise variance uses the same Bessel-corrected formula.
+

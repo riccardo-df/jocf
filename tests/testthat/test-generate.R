@@ -5,7 +5,8 @@ test_that("output structure is correct (default M=3)", {
   d <- generate_ordered_data(200)
 
   expect_type(d, "list")
-  expect_named(d, c("sample", "true_probs", "marginal_probs"))
+  expect_named(d, c("sample", "true_probs", "marginal_probs",
+                     "true_me_atmean", "true_me_atmedian"))
   expect_s3_class(d$sample, "data.frame")
   expect_true(is.matrix(d$true_probs))
   expect_true(is.numeric(d$marginal_probs))
@@ -125,4 +126,125 @@ test_that("custom M=5 with explicit probs works", {
 
   obs_props <- tabulate(d$sample$Y, nbins = 5) / 10000
   expect_equal(obs_props, probs, tolerance = 0.05)
+})
+
+
+## --- True marginal effects tests -------------------------------------------
+
+test_that("true_me fields are present in output", {
+  set.seed(30)
+  d <- generate_ordered_data(200)
+  expect_true("true_me_atmean" %in% names(d))
+  expect_true("true_me_atmedian" %in% names(d))
+})
+
+test_that("true_me dimensions are (6 x M) for default M=3", {
+  set.seed(31)
+  d <- generate_ordered_data(200)
+  expect_equal(dim(d$true_me_atmean), c(6, 3))
+  expect_equal(dim(d$true_me_atmedian), c(6, 3))
+})
+
+test_that("true_me dimensions are (6 x M) for M=2", {
+  set.seed(32)
+  d <- generate_ordered_data(200, n_categories = 2)
+  expect_equal(dim(d$true_me_atmean), c(6, 2))
+  expect_equal(dim(d$true_me_atmedian), c(6, 2))
+})
+
+test_that("true_me dimensions are (6 x M) for M=4", {
+  set.seed(33)
+  d <- generate_ordered_data(200, n_categories = 4)
+  expect_equal(dim(d$true_me_atmean), c(6, 4))
+  expect_equal(dim(d$true_me_atmedian), c(6, 4))
+})
+
+test_that("true_me dimensions are (6 x M) for M=5", {
+  set.seed(34)
+  d <- generate_ordered_data(200, n_categories = 5)
+  expect_equal(dim(d$true_me_atmean), c(6, 5))
+  expect_equal(dim(d$true_me_atmedian), c(6, 5))
+})
+
+test_that("true_me row sums are zero (probabilities sum to 1)", {
+  set.seed(35)
+  d <- generate_ordered_data(500)
+  expect_equal(unname(rowSums(d$true_me_atmean)), rep(0, 6), tolerance = 1e-10)
+  expect_equal(unname(rowSums(d$true_me_atmedian)), rep(0, 6), tolerance = 1e-10)
+})
+
+test_that("true_me row sums are zero for M=5", {
+  set.seed(36)
+  d <- generate_ordered_data(500, n_categories = 5)
+  expect_equal(unname(rowSums(d$true_me_atmean)), rep(0, 6), tolerance = 1e-10)
+  expect_equal(unname(rowSums(d$true_me_atmedian)), rep(0, 6), tolerance = 1e-10)
+})
+
+test_that("noise covariates (x5, x6) have exactly zero MEs", {
+  set.seed(37)
+  d <- generate_ordered_data(300)
+  expect_equal(as.numeric(d$true_me_atmean[5, ]), rep(0, 3))
+  expect_equal(as.numeric(d$true_me_atmean[6, ]), rep(0, 3))
+  expect_equal(as.numeric(d$true_me_atmedian[5, ]), rep(0, 3))
+  expect_equal(as.numeric(d$true_me_atmedian[6, ]), rep(0, 3))
+})
+
+test_that("noise covariates zero for M=5", {
+  set.seed(38)
+  d <- generate_ordered_data(300, n_categories = 5)
+  expect_equal(as.numeric(d$true_me_atmean[5, ]), rep(0, 5))
+  expect_equal(as.numeric(d$true_me_atmean[6, ]), rep(0, 5))
+})
+
+test_that("true_me has correct row and column names", {
+  set.seed(39)
+  d <- generate_ordered_data(200)
+  expect_equal(rownames(d$true_me_atmean), paste0("x", 1:6))
+  expect_equal(colnames(d$true_me_atmean), paste0("Y", 1:3))
+  expect_equal(rownames(d$true_me_atmedian), paste0("x", 1:6))
+  expect_equal(colnames(d$true_me_atmedian), paste0("Y", 1:3))
+})
+
+test_that("true_me names correct for M=5", {
+  set.seed(40)
+  d <- generate_ordered_data(200, n_categories = 5)
+  expect_equal(colnames(d$true_me_atmean), paste0("Y", 1:5))
+  expect_equal(colnames(d$true_me_atmedian), paste0("Y", 1:5))
+})
+
+test_that("active covariates have nonzero MEs", {
+  set.seed(41)
+  d <- generate_ordered_data(500)
+  # x1 (continuous, beta=1) and x3 (continuous, beta=0.5) should be nonzero
+  expect_true(any(d$true_me_atmean[1, ] != 0))
+  expect_true(any(d$true_me_atmean[3, ] != 0))
+  # x2 (discrete, beta=1) and x4 (discrete, beta=0.5) should be nonzero
+  expect_true(any(d$true_me_atmean[2, ] != 0))
+  expect_true(any(d$true_me_atmean[4, ] != 0))
+})
+
+test_that("continuous ME magnitudes scale with beta", {
+  set.seed(42)
+  d <- generate_ordered_data(500)
+  # |ME(x1)| / |ME(x3)| should be close to beta1/beta3 = 1/0.5 = 2
+  # for continuous covariates the ratio is exact
+  me1 <- d$true_me_atmean[1, ]
+  me3 <- d$true_me_atmean[3, ]
+  expect_equal(unname(me1 / me3), rep(2, 3), tolerance = 1e-10)
+})
+
+test_that("sign pattern: highest class ME positive for positive beta continuous covariate", {
+  set.seed(43)
+  d <- generate_ordered_data(500)
+  M <- 3
+  # For positive beta, increasing x pushes Y up, so ME for highest class > 0
+  expect_true(d$true_me_atmean[1, M] > 0)
+  expect_true(d$true_me_atmean[3, M] > 0)
+})
+
+test_that("true_me values are finite", {
+  set.seed(44)
+  d <- generate_ordered_data(200)
+  expect_true(all(is.finite(d$true_me_atmean)))
+  expect_true(all(is.finite(d$true_me_atmedian)))
 })

@@ -4,7 +4,7 @@
 \alias{predict.jocf}
 \title{Predict class probabilities and classifications from a fitted jocf object}
 \usage{
-\method{predict}{jocf}(object, newdata, num.threads = NULL, ...)
+\method{predict}{jocf}(object, newdata, variance = FALSE, num.threads = NULL, ...)
 }
 \arguments{
 \item{object}{A fitted object of class \code{"jocf"}.}
@@ -13,6 +13,10 @@
 column types as the training \code{X}.  Factor and logical columns are
 re-encoded using the level ordering stored at training time.  Unseen
 factor levels produce a warning and are mapped to the median code.}
+
+\item{variance}{Logical. If \code{TRUE}, compute variance estimates and
+standard errors for each predicted probability.
+Requires \code{object$honesty == TRUE}. Default \code{FALSE}.}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads.
 \code{NULL} (default) uses all available cores.}
@@ -33,6 +37,11 @@ averaged probabilities (see \code{vignette("jocf-theory")}).}
 leaf argmax, then the class with the most votes wins.  Unique to
 the unified OCF (see \code{vignette("jocf-theory")}).}
 }}
+\item{\code{variance}}{(nrow(newdata) x M) numeric matrix of variance
+estimates (only when \code{variance = TRUE}).}
+\item{\code{std.error}}{(nrow(newdata) x M) numeric matrix of standard
+errors, equal to \code{sqrt(pmax(variance, 0))} (only when
+\code{variance = TRUE}).}
 }
 }
 \description{
@@ -52,5 +61,12 @@ preds <- predict(fit, X_new)
 head(preds$probabilities)
 preds$classification$prob
 preds$classification$vote
+
+\donttest{
+## Honest forest with variance estimation
+fit_h <- jocf(Y, X, num.trees = 50, honesty = TRUE)
+preds_h <- predict(fit_h, X_new, variance = TRUE)
+head(preds_h$std.error)
+}
 
 }

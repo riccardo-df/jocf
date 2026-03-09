@@ -17,7 +17,7 @@ make_fit <- function(n = 120, M = 3, k = 4, num.trees = 80, seed = 1L) {
 test_that("marginal_effects eval=mean: AME has correct dimensions (k x M)", {
   d  <- make_fit(seed = 1)
   me <- marginal_effects(d$fit, data = d$X, eval = "mean")
-  expect_equal(dim(me$AME), c(d$k, d$M))
+  expect_equal(dim(me$effects), c(d$k, d$M))
 })
 
 test_that("marginal_effects eval=mean: returns a jocf_me object", {
@@ -29,13 +29,13 @@ test_that("marginal_effects eval=mean: returns a jocf_me object", {
 test_that("marginal_effects eval=mean: all AME values are finite", {
   d  <- make_fit(seed = 3)
   me <- marginal_effects(d$fit, data = d$X, eval = "mean")
-  expect_true(all(is.finite(me$AME)))
+  expect_true(all(is.finite(me$effects)))
 })
 
 test_that("marginal_effects eval=mean: AME rows sum to 0 across classes", {
   d  <- make_fit(n = 100, M = 4, k = 3, seed = 4)
   me <- marginal_effects(d$fit, data = d$X, eval = "mean")
-  expect_equal(unname(rowSums(me$AME)), rep(0, d$k), tolerance = 1e-10)
+  expect_equal(unname(rowSums(me$effects)), rep(0, d$k), tolerance = 1e-10)
 })
 
 test_that("marginal_effects eval=mean: eval field stored correctly", {
@@ -51,19 +51,19 @@ test_that("marginal_effects eval=mean: eval field stored correctly", {
 test_that("marginal_effects eval=atmean: AME has correct dimensions (k x M)", {
   d  <- make_fit(seed = 6)
   me <- marginal_effects(d$fit, data = d$X, eval = "atmean")
-  expect_equal(dim(me$AME), c(d$k, d$M))
+  expect_equal(dim(me$effects), c(d$k, d$M))
 })
 
 test_that("marginal_effects eval=atmean: all AME values are finite", {
   d  <- make_fit(seed = 7)
   me <- marginal_effects(d$fit, data = d$X, eval = "atmean")
-  expect_true(all(is.finite(me$AME)))
+  expect_true(all(is.finite(me$effects)))
 })
 
 test_that("marginal_effects eval=atmean: AME rows sum to 0 across classes", {
   d  <- make_fit(n = 100, M = 3, k = 4, seed = 8)
   me <- marginal_effects(d$fit, data = d$X, eval = "atmean")
-  expect_equal(unname(rowSums(me$AME)), rep(0, d$k), tolerance = 1e-10)
+  expect_equal(unname(rowSums(me$effects)), rep(0, d$k), tolerance = 1e-10)
 })
 
 # ===========================================================================
@@ -73,19 +73,19 @@ test_that("marginal_effects eval=atmean: AME rows sum to 0 across classes", {
 test_that("marginal_effects eval=atmedian: AME has correct dimensions (k x M)", {
   d  <- make_fit(seed = 9)
   me <- marginal_effects(d$fit, data = d$X, eval = "atmedian")
-  expect_equal(dim(me$AME), c(d$k, d$M))
+  expect_equal(dim(me$effects), c(d$k, d$M))
 })
 
 test_that("marginal_effects eval=atmedian: all AME values are finite", {
   d  <- make_fit(seed = 10)
   me <- marginal_effects(d$fit, data = d$X, eval = "atmedian")
-  expect_true(all(is.finite(me$AME)))
+  expect_true(all(is.finite(me$effects)))
 })
 
 test_that("marginal_effects eval=atmedian: AME rows sum to 0 across classes", {
   d  <- make_fit(n = 100, M = 3, k = 4, seed = 11)
   me <- marginal_effects(d$fit, data = d$X, eval = "atmedian")
-  expect_equal(unname(rowSums(me$AME)), rep(0, d$k), tolerance = 1e-10)
+  expect_equal(unname(rowSums(me$effects)), rep(0, d$k), tolerance = 1e-10)
 })
 
 # ===========================================================================
@@ -95,13 +95,13 @@ test_that("marginal_effects eval=atmedian: AME rows sum to 0 across classes", {
 test_that("marginal_effects target_covariates=c(1,3): AME has 2 rows", {
   d  <- make_fit(n = 120, M = 3, k = 4, seed = 12)
   me <- marginal_effects(d$fit, data = d$X, target_covariates = c(1L, 3L))
-  expect_equal(dim(me$AME), c(2L, d$M))
+  expect_equal(dim(me$effects), c(2L, d$M))
 })
 
 test_that("marginal_effects target_covariates subset: AME rows sum to 0", {
   d  <- make_fit(n = 120, M = 3, k = 4, seed = 13)
   me <- marginal_effects(d$fit, data = d$X, target_covariates = c(2L, 4L))
-  expect_equal(unname(rowSums(me$AME)), c(0, 0), tolerance = 1e-10)
+  expect_equal(unname(rowSums(me$effects)), c(0, 0), tolerance = 1e-10)
 })
 
 test_that("marginal_effects target_covariates: target_covariates field stored", {
@@ -139,8 +139,8 @@ test_that("marginal_effects discrete_vars: AME rows sum to 0", {
   X[, 3] <- sample(0L:2L, n, replace = TRUE)
   fit <- jocf(Y, X, num.trees = 60)
   me  <- marginal_effects(fit, data = X, discrete_vars = 3L)
-  expect_equal(unname(rowSums(me$AME)), rep(0, k), tolerance = 1e-10)
-  expect_true(all(is.finite(me$AME)))
+  expect_equal(unname(rowSums(me$effects)), rep(0, k), tolerance = 1e-10)
+  expect_true(all(is.finite(me$effects)))
 })
 
 # ===========================================================================
@@ -153,10 +153,10 @@ test_that("marginal_effects: error on wrong number of data columns", {
   expect_error(marginal_effects(d$fit, data = Xbad), regexp = "4 column")
 })
 
-test_that("marginal_effects: error on non-positive omega", {
+test_that("marginal_effects: error on non-positive bandwidth", {
   d <- make_fit(seed = 19)
-  expect_error(marginal_effects(d$fit, data = d$X, omega = -0.1),
-               regexp = "omega")
+  expect_error(marginal_effects(d$fit, data = d$X, bandwidth = -0.1),
+               regexp = "bandwidth")
 })
 
 test_that("marginal_effects: error on invalid eval argument", {
@@ -181,5 +181,5 @@ test_that("print.jocf_me: eval label appears in output", {
   d   <- make_fit(seed = 22)
   me  <- marginal_effects(d$fit, data = d$X, eval = "atmean")
   out <- capture.output(print(me))
-  expect_true(any(grepl("atmean", out)))
+  expect_true(any(grepl("Marginal Effects at Mean", out)))
 })

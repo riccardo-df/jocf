@@ -18,6 +18,7 @@ jocf(
   tune.num.reps = 100L,
   tune.num.draws = 1000L,
   honesty = FALSE,
+  honesty.fraction = 0.5,
   num.threads = NULL,
   ...
 )
@@ -70,7 +71,13 @@ to evaluate with mini-forests. Default \code{100}.}
 \item{tune.num.draws}{Positive integer. Number of new random candidates
 evaluated via the Kriging surrogate. Default \code{1000}.}
 
-\item{honesty}{Logical. Must be \code{FALSE}; \code{TRUE} is not yet implemented.}
+\item{honesty}{Logical. If \code{TRUE}, the forest uses sample splitting: trees
+are grown on a training subsample and leaf predictions are computed from a
+held-out honesty subsample. This enables valid variance estimation via
+\code{\link[=predict.jocf]{predict.jocf()}} and \code{\link[=marginal_effects.jocf]{marginal_effects.jocf()}}. Default \code{FALSE}.}
+
+\item{honesty.fraction}{Numeric in \verb{(0, 1)}. Fraction of observations
+allocated to the honesty sample when \code{honesty = TRUE}. Default \code{0.5}.}
 
 \item{num.threads}{Positive integer or \code{NULL}. Number of OpenMP threads to
 use when growing trees and computing in-sample predictions. \code{NULL}
@@ -95,6 +102,11 @@ the unified OCF (see \code{vignette("jocf-theory")}).}
 \item{\code{forest}}{List of B tree structures; used by \code{\link[=predict.jocf]{predict.jocf()}}.}
 \item{\code{splitting.rule}}{Character; the splitting rule used.}
 \item{\code{sample.fraction}}{Numeric; the subsample fraction used.}
+\item{\code{honesty}}{Logical; whether honesty was used.}
+\item{\code{honesty.fraction}}{Numeric fraction allocated to honesty sample
+(\code{NULL} when non-honest).}
+\item{\code{honest_data}}{Internal list with honesty metadata for
+variance estimation (\code{NULL} when non-honest).}
 \item{\code{M}}{Integer; number of outcome classes.}
 \item{\code{num.trees}}{Integer; number of trees grown.}
 \item{\code{k}}{Integer; number of training covariates.}
@@ -134,6 +146,13 @@ fit2 <- jocf(Y, X_mixed, num.trees = 50)
 head(fit2$predictions)
 
 \donttest{
+## Honest forest with variance estimation
+fit_h <- jocf(Y, X, num.trees = 50, honesty = TRUE)
+fit_h$honesty
+X_new <- matrix(rnorm(5 * 3), ncol = 3)
+pred_h <- predict(fit_h, X_new, variance = TRUE)
+head(pred_h$std.error)
+
 ## Built-in hyperparameter tuning (requires DiceKriging)
 if (requireNamespace("DiceKriging", quietly = TRUE)) {
   fit_tuned <- jocf(Y, X, num.trees = 50,

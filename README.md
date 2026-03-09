@@ -61,12 +61,8 @@ me
 
 - **Joint splitting criterion**: one forest for all *M* classes, equivalent to average Gini impurity.
 - **Two classification rules**: probability-based (argmax of averaged probabilities) and majority-vote (per-tree argmax aggregation, unique to the unified OCF).
+- **Honest forests with inference**: `honesty = TRUE` enables sample splitting — trees are grown on one subsample, leaves repopulated from a held-out honesty sample. `predict(..., variance = TRUE)` provides weight-based standard errors for each predicted probability; `marginal_effects()` returns SEs automatically for honest models.
 - **Weighted splitting**: optional variance-weighted criterion (`splitting.rule = "weighted"`) to equalise contribution of rare classes.
 - **Built-in hyperparameter tuning**: GRF-style tuning of `mtry`, `min.node.size`, and `sample.fraction` via debiased OOB error and a Kriging surrogate (`tune.parameters = "all"`).
 - **OpenMP parallelism**: tree growing, prediction, and marginal effects are parallelised via OpenMP.
-- **Nonparametric marginal effects**: finite-difference estimator following Lechner (2019), with support for continuous and discrete covariates.
-
-## References
-
-- Lechner, M. (2019). Modified Causal Forests for Estimating Heterogeneous Causal Effects. *arXiv preprint arXiv:1812.09487*.
-- Lechner, M. & Okasa, G. (2019). Random Forest Estimation of the Ordered Choice Model. *arXiv preprint arXiv:1907.02436*.
+- **Nonparametric marginal effects**: finite-difference estimator with support for continuous and discrete covariates.

@@ -82,6 +82,64 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// grow_forest_honest_cpp
+Rcpp::List grow_forest_honest_cpp(Rcpp::IntegerVector Y, Rcpp::NumericMatrix X, int num_trees, int min_node_size, int max_depth, int n_sub_tr, int mtry, int M, Rcpp::NumericVector lambda, Rcpp::IntegerVector tr_indices, Rcpp::IntegerVector hon_indices, int num_threads);
+RcppExport SEXP _jocf_grow_forest_honest_cpp(SEXP YSEXP, SEXP XSEXP, SEXP num_treesSEXP, SEXP min_node_sizeSEXP, SEXP max_depthSEXP, SEXP n_sub_trSEXP, SEXP mtrySEXP, SEXP MSEXP, SEXP lambdaSEXP, SEXP tr_indicesSEXP, SEXP hon_indicesSEXP, SEXP num_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type X(XSEXP);
+    Rcpp::traits::input_parameter< int >::type num_trees(num_treesSEXP);
+    Rcpp::traits::input_parameter< int >::type min_node_size(min_node_sizeSEXP);
+    Rcpp::traits::input_parameter< int >::type max_depth(max_depthSEXP);
+    Rcpp::traits::input_parameter< int >::type n_sub_tr(n_sub_trSEXP);
+    Rcpp::traits::input_parameter< int >::type mtry(mtrySEXP);
+    Rcpp::traits::input_parameter< int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type tr_indices(tr_indicesSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type hon_indices(hon_indicesSEXP);
+    Rcpp::traits::input_parameter< int >::type num_threads(num_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(grow_forest_honest_cpp(Y, X, num_trees, min_node_size, max_depth, n_sub_tr, mtry, M, lambda, tr_indices, hon_indices, num_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
+// predict_honest_cpp
+Rcpp::List predict_honest_cpp(Rcpp::List forest, Rcpp::NumericMatrix X_new, Rcpp::IntegerVector Y_hon, int n_hon, int M, bool compute_variance, int num_threads);
+RcppExport SEXP _jocf_predict_honest_cpp(SEXP forestSEXP, SEXP X_newSEXP, SEXP Y_honSEXP, SEXP n_honSEXP, SEXP MSEXP, SEXP compute_varianceSEXP, SEXP num_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type forest(forestSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type X_new(X_newSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type Y_hon(Y_honSEXP);
+    Rcpp::traits::input_parameter< int >::type n_hon(n_honSEXP);
+    Rcpp::traits::input_parameter< int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< bool >::type compute_variance(compute_varianceSEXP);
+    Rcpp::traits::input_parameter< int >::type num_threads(num_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(predict_honest_cpp(forest, X_new, Y_hon, n_hon, M, compute_variance, num_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
+// marginal_effects_honest_cpp
+Rcpp::List marginal_effects_honest_cpp(Rcpp::List forest, Rcpp::NumericMatrix X_eval, Rcpp::IntegerVector target_vars, Rcpp::LogicalVector is_discrete, Rcpp::NumericVector h_vec, Rcpp::IntegerVector Y_hon, int n_hon, int M, int num_threads);
+RcppExport SEXP _jocf_marginal_effects_honest_cpp(SEXP forestSEXP, SEXP X_evalSEXP, SEXP target_varsSEXP, SEXP is_discreteSEXP, SEXP h_vecSEXP, SEXP Y_honSEXP, SEXP n_honSEXP, SEXP MSEXP, SEXP num_threadsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type forest(forestSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericMatrix >::type X_eval(X_evalSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type target_vars(target_varsSEXP);
+    Rcpp::traits::input_parameter< Rcpp::LogicalVector >::type is_discrete(is_discreteSEXP);
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type h_vec(h_vecSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type Y_hon(Y_honSEXP);
+    Rcpp::traits::input_parameter< int >::type n_hon(n_honSEXP);
+    Rcpp::traits::input_parameter< int >::type M(MSEXP);
+    Rcpp::traits::input_parameter< int >::type num_threads(num_threadsSEXP);
+    rcpp_result_gen = Rcpp::wrap(marginal_effects_honest_cpp(forest, X_eval, target_vars, is_discrete, h_vec, Y_hon, n_hon, M, num_threads));
+    return rcpp_result_gen;
+END_RCPP
+}
 // node_impurity_cpp
 double node_impurity_cpp(Rcpp::IntegerVector counts, int n, int M, Rcpp::NumericVector lambda);
 RcppExport SEXP _jocf_node_impurity_cpp(SEXP countsSEXP, SEXP nSEXP, SEXP MSEXP, SEXP lambdaSEXP) {
@@ -117,6 +175,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_jocf_grow_forest_oob_cpp", (DL_FUNC) &_jocf_grow_forest_oob_cpp, 10},
     {"_jocf_predict_forest_cpp", (DL_FUNC) &_jocf_predict_forest_cpp, 4},
     {"_jocf_marginal_effects_cpp", (DL_FUNC) &_jocf_marginal_effects_cpp, 7},
+    {"_jocf_grow_forest_honest_cpp", (DL_FUNC) &_jocf_grow_forest_honest_cpp, 12},
+    {"_jocf_predict_honest_cpp", (DL_FUNC) &_jocf_predict_honest_cpp, 7},
+    {"_jocf_marginal_effects_honest_cpp", (DL_FUNC) &_jocf_marginal_effects_honest_cpp, 9},
     {"_jocf_node_impurity_cpp", (DL_FUNC) &_jocf_node_impurity_cpp, 4},
     {"_jocf_find_best_split_cpp", (DL_FUNC) &_jocf_find_best_split_cpp, 5},
     {NULL, NULL, 0}

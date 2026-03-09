@@ -238,8 +238,8 @@ test_that("marginal_effects() auto-excludes factor columns with message", {
     "excluded from marginal effects"
   )
   # Only numeric covariates in AME
-  expect_equal(nrow(me$AME), 2)
-  expect_equal(rownames(me$AME), c("x1", "x3"))
+  expect_equal(nrow(me$effects), 2)
+  expect_equal(rownames(me$effects), c("x1", "x3"))
 })
 
 test_that("marginal_effects() warns when user requests factor column", {
@@ -256,8 +256,8 @@ test_that("marginal_effects() warns when user requests factor column", {
     me <- marginal_effects(fit, X, target_covariates = c(1, 2)),
     "excluded from marginal effects"
   )
-  expect_equal(nrow(me$AME), 1)
-  expect_equal(rownames(me$AME), "x1")
+  expect_equal(nrow(me$effects), 1)
+  expect_equal(rownames(me$effects), "x1")
 })
 
 test_that("marginal_effects() errors when all covariates are factors", {
